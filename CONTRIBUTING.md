@@ -5,7 +5,8 @@
 ## 环境
 
 - Node.js >= 20.19
-- 可选：JDK（提供 `keytool`），只有跑完整 `npm run build` 生成调试签名时才需要
+- 可选：JDK（提供 `keytool`），只有跑完整 `npm run build` 生成调试签名时才需要；
+  签名口令缺失时会自动生成到 `capsule/signing/capsule.properties`（不要提交）
 - 项目使用 npm；请提交 `package-lock.json` 的变更
 
 ```bash

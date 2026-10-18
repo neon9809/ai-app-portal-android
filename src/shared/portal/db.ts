@@ -18,9 +18,8 @@ import type {
   UsageRecord,
 } from './types'
 
-// 数据库名沿用早期内部代号：改名会让已安装用户的数据变成一座空库。
-// 开源版本继续读取同名库，保证升级不丢数据。
-const DB_NAME = 'zaowu-portal'
+// 数据库名：开源首发使用产品名；旧内部代号库不再读取（首发前没有外部用户数据）。
+const DB_NAME = 'ai-app-portal'
 const DB_VERSION = 2
 
 export const STORE = {

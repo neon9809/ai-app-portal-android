@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { CircleHelp, FileUp, Plus, Settings, Sparkles, X } from 'lucide-react'
 
-import logo from '@/assets/zaowu-mark.svg'
+import logo from '@/assets/app-mark.svg'
 import { useImport } from '@/app/components/ImportProvider'
 import { useOnboarding } from '@/app/components/Onboarding'
 import { cn } from '@/shared/lib/cn'

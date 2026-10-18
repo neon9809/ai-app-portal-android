@@ -14,9 +14,9 @@
   },
   "scripts": {
     "dev": "node scripts/ensure-deps.mjs && vite",
-    "dev:standalone": "node scripts/ensure-deps.mjs && vite --config vite.config.standalone.ts",
+    "dev:platform": "node scripts/ensure-deps.mjs && vite --config vite.config.platform.ts",
     "build": "node scripts/build.mjs",
-    "build:standalone": "node scripts/ensure-deps.mjs && vite build --config vite.config.standalone.ts",
+    "build:platform": "node scripts/ensure-deps.mjs && vite build --config vite.config.platform.ts && node scripts/finalize-build.mjs",
     "build:client": "node scripts/build.mjs --client",
     "build:admin": "node scripts/build.mjs --admin",
     "preview": "node scripts/ensure-deps.mjs && vite preview",

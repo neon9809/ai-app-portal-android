@@ -173,6 +173,9 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
   const mcpReadyRef = useRef(false)
   /** iframe 是否已加载完成；触发器事件要等它加载后再投递 */
   const frameReadyRef = useRef(false)
+  /** 应用是否自行导航离开了沙箱文档（第二次 load 即视为逃逸） */
+  const frameEscapedRef = useRef(false)
+  const frameLoadsRef = useRef(0)
   const triggerQueueRef = useRef<TriggerEvent[]>([])
 
   const html = useMemo(
@@ -194,6 +197,8 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
     inFlightRef.current.clear()
     deniedRef.current = new Set()
     mcpReadyRef.current = false
+    frameEscapedRef.current = false
+    frameLoadsRef.current = 0
     setPrompt(null)
     grantedRef.current = new Set()
     grantsReadyRef.current = loadGrants()
@@ -281,6 +286,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
   /* ------------------------- 触发器与应用设置 ------------------------- */
 
   const deliverTrigger = useCallback((event: TriggerEvent) => {
+    if (frameEscapedRef.current) return
     if (!frameReadyRef.current) {
       triggerQueueRef.current.push(event)
       return
@@ -292,6 +298,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
   }, [])
 
   const flushTriggers = useCallback(() => {
+    if (frameEscapedRef.current) return
     frameReadyRef.current = true
     const queue = triggerQueueRef.current
     triggerQueueRef.current = []
@@ -302,6 +309,23 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
       )
     }
   }, [])
+
+  /**
+   * iframe 每次 load 都会进来：第一次是 srcdoc 文档加载完成；
+   * 之后再有 load 说明应用把文档导航到了别处（沙箱里的新文档没有 CSP/SDK），
+   * 立即拆掉推送通道并卸载，避免把触发事件或原生事件送进攻击者页面。
+   */
+  const handleFrameLoad = useCallback(() => {
+    frameLoadsRef.current += 1
+    if (frameLoadsRef.current > 1) {
+      frameEscapedRef.current = true
+      frameReadyRef.current = false
+      triggerQueueRef.current = []
+      setError('应用尝试跳转到外部页面，已阻止')
+      return
+    }
+    flushTriggers()
+  }, [flushTriggers])
 
   const registerTrigger = useCallback(async (trigger: AppTrigger) => {
     await saveTrigger(trigger)
@@ -522,6 +546,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
     void (async () => {
       for (const name of events) {
         const off = await onNativeEvent(name, (payload) => {
+          if (frameEscapedRef.current) return
           frameRef.current?.contentWindow?.postMessage(
             { __aiPortal: 1, event: name, payload },
             '*',
@@ -540,6 +565,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow) return
+      if (frameEscapedRef.current) return
       // srcdoc + sandbox（无 allow-same-origin）的文档是不透明源，origin 恒为 "null"
       // （个别内核给空串）。应用若自行导航到外部页面，origin 会变成目标站点，这里直接拒绝，
       // 避免新文档在没有 CSP 的情况下继续以该应用身份调用 portal 能力。
@@ -677,7 +703,15 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
           <AlertTriangle className="size-8 text-warning" aria-hidden />
           <p className="text-body font-medium">应用没能打开</p>
           <p className="text-caption text-muted-foreground">{error}</p>
-          <Button variant="outline" onClick={() => setReloadKey((value) => value + 1)}>
+          <Button
+            variant="outline"
+            onClick={() => {
+              frameEscapedRef.current = false
+              frameLoadsRef.current = 0
+              frameReadyRef.current = false
+              setReloadKey((value) => value + 1)
+            }}
+          >
             <RefreshCw className="size-4" aria-hidden />
             重新加载
           </Button>
@@ -690,7 +724,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
           srcDoc={html}
           sandbox="allow-scripts allow-forms"
           className="h-full w-full border-0 bg-surface"
-          onLoad={flushTriggers}
+          onLoad={handleFrameLoad}
           onError={() => setError('页面加载失败，请重试')}
         />
       )}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { MoreHorizontal, Plus } from 'lucide-react'
 
-import emptyIllustration from '@/assets/zaowu-empty.svg'
+import emptyIllustration from '@/assets/app-empty.svg'
 import { listApps } from '@/shared/portal/db'
 import type { PortalApp } from '@/shared/portal/types'
 import { formatRelativeTime } from '@/shared/portal/utils'

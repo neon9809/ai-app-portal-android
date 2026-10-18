@@ -13,7 +13,8 @@
  * ========================================================================== */
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { randomBytes } from 'node:crypto'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -56,8 +57,25 @@ export function ensureDebugSigning({ quiet = false } = {}) {
     return true
   }
   if (!existsSync(PROPERTIES)) {
-    console.error('✗ 缺少 capsule/signing/capsule.properties（storePassword / keyAlias / keyPassword）')
-    return false
+    if (existsSync(KEYSTORE)) {
+      // 证书存在但口令配置丢了：不能凭空生成新口令，否则与 p12 不匹配
+      console.error('✗ 已有签名证书但缺少 capsule/signing/capsule.properties，请恢复对应口令配置')
+      return false
+    }
+    // 新 clone 没有口令配置：自动生成一份随机口令，保证开箱即可构建调试包。
+    const password = randomBytes(18).toString('hex')
+    mkdirSync(SIGNING_DIR, { recursive: true })
+    writeFileSync(
+      PROPERTIES,
+      [
+        '# 自动生成的调试签名口令；仅用于本机打包，不要提交，也不能用于上架。',
+        `storePassword=${password}`,
+        'keyAlias=debug',
+        `keyPassword=${password}`,
+        '',
+      ].join('\n'),
+    )
+    if (!quiet) console.log('· 已生成调试签名配置：capsule/signing/capsule.properties')
   }
   const keytool = resolveKeytool()
   if (!keytool) {

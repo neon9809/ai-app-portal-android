@@ -35,12 +35,13 @@ npm run dev        # 开发预览（默认 5173 端口）
 ```bash
 npm run typecheck  # 类型检查
 npm run test:e2e   # 端到端冒烟（逻辑链路 + 预览模块编译）
-npm run build      # 构建 dist/client（壳侧 bundle，供 APK 打包）
-npm run build:standalone  # 不依赖平台预览插件的 H5 构建（只出 dist/client/web）
+npm run build      # 构建 dist/client（默认配置，不依赖平台内部包）
 ```
 
 `npm run build` 会调用 `finalize-build` 生成调试签名，需要本机有 JDK（`keytool`）；
-只构建 H5 时用 `build:standalone`，不需要 JDK。
+签名口令在缺失时自动生成到 `capsule/signing/capsule.properties`，开箱即可构建。
+需要平台预览能力（源码定位 / 元素点选 / 错误采集）时用
+`npm run dev:platform` / `npm run build:platform`，它们依赖可选包 `stepai-vite-config`。
 
 构建产物：
 
@@ -86,8 +87,8 @@ public/              静态资源（含 LICENSE / NOTICE）
 
 - 壳在页面加载时注入 `capsule` SDK 与 `/sdk/capsule.js`（构建期插件写入产物 HTML），提供拍照、录音、定位、蓝牙等原生能力；
 - 端侧原子能力由壳的 `window.mcp` 提供，页面通过宿主转发调用；
-- 构建配置的默认入口 `vite.config.ts` 依赖平台提供的 `stepai-vite-config`（`package.json` 里是可选依赖）。
-  不依赖它时用 `npm run dev:standalone` / `npm run build:standalone`，业务代码完全一致，只少了预览定位类插件。
+- 默认构建（`vite.config.ts`）不依赖平台包；只有 `dev:platform` / `build:platform` 会使用可选的
+  `stepai-vite-config`，用于源码定位、元素点选与预览错误采集。
 
 ## 贡献
 

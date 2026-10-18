@@ -24,5 +24,12 @@
     },
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "vite.config.ts", "vite.config.admin.ts", "vite.shared.ts", "scripts/e2e-entry.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "vite.config.platform.ts",
+    "vite.shared.ts",
+    "vite.plugins.ts",
+    "scripts/e2e-entry.ts"
+  ]
 }

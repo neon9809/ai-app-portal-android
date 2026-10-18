@@ -25,13 +25,14 @@ import {
 } from './db'
 import { uid, now } from './utils'
 
-// MAGIC / format / 扩展名沿用早期内部代号：改名会让已有备份文件无法解密与导入，
-// 开源版本不做破坏性重命名。
-const MAGIC = new Uint8Array([0x5a, 0x57, 0x42, 0x4b, 0x31]) // ZWBK1
+// 新备份使用产品标识；旧内部代号的备份仍可解密与导入（见 decryptBackup）。
+const MAGIC = new Uint8Array([0x41, 0x49, 0x50, 0x42, 0x31]) // AIPB1
+const LEGACY_MAGIC = new Uint8Array([0x5a, 0x57, 0x42, 0x4b, 0x31]) // ZWBK1
 const PBKDF2_ITERATIONS = 310_000
 
 export interface BackupPayload {
-  format: 'zaowu-backup'
+  /** 新备份写 ai-app-portal-backup；旧的 zaowu-backup 仍可解密与恢复 */
+  format: 'ai-app-portal-backup' | 'zaowu-backup'
   version: 1
   exportedAt: number
   apps: PortalApp[]
@@ -61,7 +62,7 @@ async function collectPayload(): Promise<BackupPayload> {
   const settings = await idbGetAll<{ key: string; value: unknown }>(STORE.settings)
 
   return {
-    format: 'zaowu-backup',
+    format: 'ai-app-portal-backup',
     version: 1,
     exportedAt: now(),
     apps,
@@ -126,7 +127,7 @@ export async function exportBackup(passphrase: string): Promise<{ blob: Blob; fi
   ).padStart(2, '0')}`
   return {
     blob: new Blob([output as unknown as BlobPart], { type: 'application/octet-stream' }),
-    filename: `zaowu-backup-${stamp}.zwbackup`,
+    filename: `ai-app-portal-backup-${stamp}.aapbackup`,
   }
 }
 
@@ -134,8 +135,10 @@ export async function decryptBackup(bytes: Uint8Array, passphrase: string): Prom
   if (bytes.length < MAGIC.length + 16 + 12 + 16) {
     throw new Error('这个文件不是有效的AI应用门户备份')
   }
-  for (let index = 0; index < MAGIC.length; index += 1) {
-    if (bytes[index] !== MAGIC[index]) throw new Error('这个文件不是有效的AI应用门户备份')
+  const matches = (magic: Uint8Array) =>
+    magic.every((byte, index) => bytes[index] === byte)
+  if (!matches(MAGIC) && !matches(LEGACY_MAGIC)) {
+    throw new Error('这个文件不是有效的AI应用门户备份')
   }
   const salt = bytes.slice(MAGIC.length, MAGIC.length + 16)
   const iv = bytes.slice(MAGIC.length + 16, MAGIC.length + 28)
@@ -159,7 +162,9 @@ export async function decryptBackup(bytes: Uint8Array, passphrase: string): Prom
   } catch {
     throw new Error('备份内容无法解析')
   }
-  if (payload.format !== 'zaowu-backup' || !Array.isArray(payload.apps)) {
+  const formatOk =
+    payload.format === 'ai-app-portal-backup' || payload.format === 'zaowu-backup'
+  if (!formatOk || !Array.isArray(payload.apps)) {
     throw new Error('备份内容格式不正确')
   }
   return payload

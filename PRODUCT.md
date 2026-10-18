@@ -217,7 +217,7 @@ await portal.device.call('get_weather', { province: '上海市', city: '上海�
 
 ### 9.1 数据在哪里
 
-所有数据都在本机 IndexedDB（`zaowu-portal`）：
+所有数据都在本机 IndexedDB（`ai-app-portal`）：
 
 | 存储 | 内容 |
 | --- | --- |

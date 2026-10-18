@@ -30,14 +30,23 @@ export function UsagePage() {
   const [apps, setApps] = useState<Array<{ app: PortalApp; bytes: number }>>([])
 
   const load = useCallback(async () => {
-    const [records, allApps] = await Promise.all([listUsage(), listApps()])
-    const list = allApps.filter((app) => app.status === 'installed' || Boolean(app.html))
-    setUsage(records)
-    const sizes = await Promise.all(
-      list.map(async (app) => ({ app, bytes: await kvBytes(app.id) })),
-    )
-    setApps(sizes)
-  }, [])
+    try {
+      const [records, allApps] = await Promise.all([listUsage(), listApps()])
+      const list = allApps.filter((app) => app.status === 'installed' || Boolean(app.html))
+      setUsage(records)
+      const sizes = await Promise.all(
+        list.map(async (app) => ({ app, bytes: await kvBytes(app.id) })),
+      )
+      setApps(sizes)
+    } catch (error) {
+      setUsage([])
+      toast({
+        title: '读取用量失败',
+        description: (error as Error).message,
+        tone: 'danger',
+      })
+    }
+  }, [toast])
 
   useEffect(() => {
     void load()
@@ -45,11 +54,15 @@ export function UsagePage() {
 
   const clearUsage = async () => {
     if (!usage) return
-    for (const record of usage) {
-      await idbDelete(STORE.usage, record.id)
+    try {
+      for (const record of usage) {
+        await idbDelete(STORE.usage, record.id)
+      }
+      setUsage([])
+      toast({ title: '统计已清空', description: '不影响应用与数据', tone: 'info' })
+    } catch (error) {
+      toast({ title: '清空失败', description: (error as Error).message, tone: 'danger' })
     }
-    setUsage([])
-    toast({ title: '统计已清空', description: '不影响应用与数据', tone: 'info' })
   }
 
   if (usage === null) {

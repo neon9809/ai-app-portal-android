@@ -77,7 +77,7 @@ export function BackupPage() {
 
   const handlePickFile = async () => {
     try {
-      const picked = await pickFile('.zwbackup,.neon-backup,application/octet-stream')
+      const picked = await pickFile('.aapbackup,.zwbackup,.neon-backup,application/octet-stream')
       if (!picked) return
       setFileName(picked.name)
       setPendingBytes(picked.bytes)

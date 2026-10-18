@@ -186,7 +186,7 @@ export function injectSandboxSdk(html: string, mediaHost?: string): string {
   const media = host ? `https://${host}` : ''
   const csp = [
     "default-src 'none'",
-    "script-src 'unsafe-inline' 'unsafe-eval'",
+    "script-src 'unsafe-inline'",
     "style-src 'unsafe-inline'",
     `img-src data: blob: ${media}`.trim(),
     `media-src data: blob: ${media}`.trim(),
