@@ -342,6 +342,9 @@ if (!CLIENT_ONLY && existsSync(ADMIN_ENTRY)) {
 
 if (CLIENT_ONLY) {
   console.log('✓ 构建完成：dist/client/（壳侧 bundle 内容）；本次为 --client，未构建 Admin UI')
-} else {
+} else if (existsSync(path.join(ROOT, 'dist', 'admin', 'index.html'))) {
   console.log('✓ 构建完成：dist/client/（壳侧 bundle 内容）、dist/admin/（Admin UI 站点）')
+} else {
+  // 本工程没有管理后台：不要输出一个并不存在的产物目录
+  console.log('✓ 构建完成：dist/client/（壳侧 bundle 内容）')
 }

@@ -286,7 +286,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
       return
     }
     frameRef.current?.contentWindow?.postMessage(
-      { __zaowu: 1, event: 'trigger', payload: event },
+      { __aiPortal: 1, event: 'trigger', payload: event },
       '*',
     )
   }, [])
@@ -297,7 +297,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
     triggerQueueRef.current = []
     for (const event of queue) {
       frameRef.current?.contentWindow?.postMessage(
-        { __zaowu: 1, event: 'trigger', payload: event },
+        { __aiPortal: 1, event: 'trigger', payload: event },
         '*',
       )
     }
@@ -523,7 +523,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
       for (const name of events) {
         const off = await onNativeEvent(name, (payload) => {
           frameRef.current?.contentWindow?.postMessage(
-            { __zaowu: 1, event: name, payload },
+            { __aiPortal: 1, event: name, payload },
             '*',
           )
         })
@@ -540,6 +540,10 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frameRef.current?.contentWindow) return
+      // srcdoc + sandbox（无 allow-same-origin）的文档是不透明源，origin 恒为 "null"
+      // （个别内核给空串）。应用若自行导航到外部页面，origin 会变成目标站点，这里直接拒绝，
+      // 避免新文档在没有 CSP 的情况下继续以该应用身份调用 portal 能力。
+      if (event.origin !== 'null' && event.origin !== '') return
       const data = event.data
       if (!isSandboxRequest(data)) return
       const params = data.params ?? {}
@@ -558,7 +562,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
           at: now(),
         })
         frameRef.current?.contentWindow?.postMessage(
-          { __zaowu: 1, reply: true, id: data.id, ok: true, result: true },
+          { __aiPortal: 1, reply: true, id: data.id, ok: true, result: true },
           '*',
         )
         return
@@ -639,7 +643,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
             return response
           })
           frameRef.current?.contentWindow?.postMessage(
-            { __zaowu: 1, reply: true, id: data.id, ok: true, result },
+            { __aiPortal: 1, reply: true, id: data.id, ok: true, result },
             '*',
           )
         } catch (cause) {
@@ -653,7 +657,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
             at: now(),
           })
           frameRef.current?.contentWindow?.postMessage(
-            { __zaowu: 1, reply: true, id: data.id, ok: false, error: message },
+            { __aiPortal: 1, reply: true, id: data.id, ok: false, error: message },
             '*',
           )
         }

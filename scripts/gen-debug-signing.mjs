@@ -96,7 +96,7 @@ export function ensureDebugSigning({ quiet = false } = {}) {
       '-keypass',
       keyPassword,
       '-dname',
-      `CN=${appName}, O=StepX, C=CN`,
+      `CN=${appName}, O=AI App Portal, C=CN`,
     ],
     { stdio: 'inherit' },
   )

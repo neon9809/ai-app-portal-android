@@ -53,7 +53,8 @@ export function AboutPage() {
           </p>
           <p className="mt-2 text-caption text-muted-foreground">
             使用的开源组件：React、React Router、Vite、Tailwind CSS（MIT）、
-            lucide-react（ISC）、fflate、clsx、tailwind-merge、Supabase JS（MIT）。
+            lucide-react（ISC）、fflate、clsx、tailwind-merge（MIT）；
+            视口单位兜底衍生自 joppuyo/large-small-dynamic-viewport-units-polyfill（MIT）。
             版权归各项目作者所有。
           </p>
         </div>

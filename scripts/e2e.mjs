@@ -52,7 +52,8 @@ try {
   const response = await fetch(previewBase, { signal: AbortSignal.timeout(5000) })
   const html = await response.text()
   const mounted = html.includes('id="root"')
-  const entry = html.includes('/@vite/client') && html.includes('stepfun-preview-runtime')
+  const entry =
+    html.includes('/@vite/client') && /<script[^>]+type="module"/i.test(html)
   if (response.ok && mounted && entry) {
     extra += 1
     console.log(`[32m✓[0m 预览冒烟：${previewBase} 返回页面并挂载入口脚本`)

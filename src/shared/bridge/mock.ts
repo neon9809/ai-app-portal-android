@@ -498,7 +498,7 @@ export function createMockSdk(): CapsuleSdk {
       case 'getClipboardData':
         return ok({ data: (await navigator.clipboard?.readText().catch(() => '')) ?? '' })
       case 'chooseImage':
-        // 真机返回的是虚拟 URL（https://<页面主机>/media/<文件名>，测试包 appassets.t-stepos.com，线上包 appassets.stepaos.com），
+        // 真机返回的是壳提供的虚拟 URL（https://<页面主机>/media/<文件名>），
         // 这里用 data: URL 只是为了让预览里的 <img src> 能真的显示出来
         return ok({
           tempFilePaths: [MOCK_IMAGE],

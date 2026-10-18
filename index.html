@@ -22,9 +22,9 @@
   <body>
     <div id="root"></div>
     <!--
-      壳桥接 SDK（/sdk/capsule.js）不在这里静态引入：浏览器 / 平台预览没有它，直接写会 404。
-      它由构建期插件（vite.config.ts 的 capsuleSdkInjectPlugin）注入进产物 HTML，只在壳内可达
-      （测试包主机 appassets.t-stepos.com，线上包 appassets.stepaos.com），不要手写 <script> 到这里。
+      壳桥接 SDK（/sdk/capsule.js）不在这里静态引入：浏览器 / 预览没有它，直接写会 404。
+      它由构建期插件（vite.config.ts 的 capsuleSdkInjectPlugin）注入进产物 HTML，只在壳内可达，
+      不要手写 <script> 到这里。
       预览里加载不到时桥接层回落到 mock（见 src/shared/bridge/loader.ts）。
     -->
     <script type="module" src="/src/app/main.tsx"></script>

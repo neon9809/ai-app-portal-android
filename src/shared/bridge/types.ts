@@ -217,7 +217,7 @@ export interface NativeCapabilityMap {
   }
   chooseImage: {
     params: { count?: number; sourceType?: Array<'album' | 'camera'>; sizeType?: string[] }
-    /** tempFilePaths 是虚拟 URL（https://<页面主机>/media/…，测试包 appassets.t-stepos.com，线上包 appassets.stepaos.com），可直接给 <img> */
+    /** tempFilePaths 是壳提供的虚拟 URL（https://<页面主机>/media/…），可直接给 <img> */
     result: { tempFilePaths: string[]; tempFiles: NativeImageFile[] }
   }
   previewImage: { params: { urls?: string[]; current?: string }; result: Record<string, never> }

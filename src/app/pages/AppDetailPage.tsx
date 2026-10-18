@@ -102,6 +102,7 @@ export function AppDetailPage() {
   const [usage, setUsage] = useState<UsageRecord[]>([])
   const [bytes, setBytes] = useState(0)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
   const [showSource, setShowSource] = useState(false)
   const [logs, setLogs] = useState<LogRecord[]>([])
   const [showLogs, setShowLogs] = useState(false)
@@ -186,17 +187,25 @@ export function AppDetailPage() {
 
   const clearData = async () => {
     if (!app) return
-    await kvClear(app.id)
-    await addAudit({
-      id: uid('au_'),
-      appId: app.id,
-      appName: app.name,
-      kind: 'storage.clear',
-      detail: '清空应用数据',
-      at: now(),
-    })
-    setBytes(0)
-    toast({ title: '数据已清空', tone: 'success' })
+    setBusy(true)
+    try {
+      await kvClear(app.id)
+      await addAudit({
+        id: uid('au_'),
+        appId: app.id,
+        appName: app.name,
+        kind: 'storage.clear',
+        detail: '清空应用数据',
+        at: now(),
+      })
+      setBytes(0)
+      setConfirmClear(false)
+      toast({ title: '数据已清空', tone: 'success' })
+    } catch (error) {
+      toast({ title: '清空失败', description: (error as Error).message, tone: 'danger' })
+    } finally {
+      setBusy(false)
+    }
   }
 
   const revoke = async (capability: CapabilityGrant['capability']) => {
@@ -359,7 +368,7 @@ export function AppDetailPage() {
               <p className="text-caption text-muted-foreground">{formatBytes(bytes)}</p>
             </div>
             {bytes > 0 && (
-              <Button size="sm" variant="ghost" onClick={() => void clearData()}>
+              <Button size="sm" variant="ghost" onClick={() => setConfirmClear(true)}>
                 清空
               </Button>
             )}
@@ -611,6 +620,25 @@ export function AppDetailPage() {
             ))}
           </ul>
         )}
+      </Dialog>
+
+      <Dialog
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        title="清空这个应用的数据？"
+        description="应用保存的所有数据都会被删除，代码与权限不受影响。这个操作无法恢复。"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmClear(false)}>
+              取消
+            </Button>
+            <Button variant="danger" onClick={() => void clearData()} disabled={busy}>
+              {busy ? '清空中…' : '清空数据'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-caption text-muted-foreground">建议先导出备份或 .neon-aap 包。</p>
       </Dialog>
 
       <Dialog

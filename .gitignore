@@ -5,7 +5,7 @@ dist-ssr
 *.local
 *.log
 .env
-.env.local
+.env.*
 .vite
 .open-source-snapshot
 

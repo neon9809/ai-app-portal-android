@@ -18,6 +18,8 @@ import type {
   UsageRecord,
 } from './types'
 
+// 数据库名沿用早期内部代号：改名会让已安装用户的数据变成一座空库。
+// 开源版本继续读取同名库，保证升级不丢数据。
 const DB_NAME = 'zaowu-portal'
 const DB_VERSION = 2
 
@@ -449,6 +451,10 @@ export async function replaceAllData(payload: {
   tx.objectStore(STORE.logs).clear()
   tx.objectStore(STORE.grants).clear()
   tx.objectStore(STORE.triggers).clear()
+  // settings / usage 也要清空：否则旧预算、应用设置与历史用量会在恢复后残留，
+  // 用量还会被重复计入预算。
+  tx.objectStore(STORE.settings).clear()
+  tx.objectStore(STORE.usage).clear()
   for (const app of payload.apps) tx.objectStore(STORE.apps).put(app)
   for (const item of payload.kv) tx.objectStore(STORE.kv).put(item)
   for (const grant of payload.grants) tx.objectStore(STORE.grants).put(grant)

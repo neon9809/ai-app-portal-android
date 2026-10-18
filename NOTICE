@@ -25,6 +25,8 @@ Copyright (C) 2026 AI应用门户 contributors
 - lucide-react（图标）—— ISC License
 - fflate（ZIP 打包）—— MIT License
 - clsx、tailwind-merge —— MIT License
-- Supabase JS Client —— MIT License
+- viewport-units 兜底（`src/shared/native/viewport-units.ts`）衍生自
+  joppuyo/large-small-dynamic-viewport-units-polyfill —— MIT License
 
 各依赖的完整许可证文本随 npm 包分发，位于 node_modules/<包名>/LICENSE。
+衍生 polyfill 的上游地址：github.com/joppuyo/large-small-dynamic-viewport-units-polyfill

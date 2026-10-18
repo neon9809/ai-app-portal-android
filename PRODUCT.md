@@ -295,7 +295,7 @@ README.txt      给接收者看的说明
 
 ## 13. 验收清单
 
-### 13.1 已自动化（`npm run test:e2e`，53/53 通过）
+### 13.1 已自动化（`npm run test:e2e`，54/54 通过）
 
 - 需求推断：提醒 + 语音播报会打开触发器 / 通知 / 语音能力；普通工具不声明敏感能力；
 - 模型产物解析：能力字段规范化、非法设备组被过滤、非 JSON 报可读错误；
@@ -311,8 +311,8 @@ README.txt      给接收者看的说明
 ### 13.2 已通过的工程门禁
 
 - `npm run typecheck`：通过；
-- `npm run build`：通过（`dist/client/` + `dist/admin/`）；
-- 工程校验：33/33 通过。
+- `npm run build`：通过（产出 `dist/client/`；本机有 JDK 时同时生成调试签名）；
+- 平台内部工程门禁：33/33（该脚本不随开源仓库发布，外部贡献者以 typecheck / e2e / build 三项为准）。
 
 ### 13.3 需人工 / 真机验证
 
@@ -354,4 +354,4 @@ README.txt      给接收者看的说明
 - 本工程许可证：GPL-3.0（全文见 `LICENSE`，来源与第三方组件说明见 `NOTICE`）
 - 原项目版权归其作者所有；本应用保留原项目的版权与许可声明，源码随应用提供，修改与再分发遵循同一许可证。
 
-使用的开源组件：React、React Router、Vite、Tailwind CSS（MIT）、lucide-react（ISC）、fflate、clsx、tailwind-merge、Supabase JS（MIT）。版权归各项目作者所有，完整许可证随 npm 包分发。
+使用的开源组件：React、React Router、Vite、Tailwind CSS（MIT）、lucide-react（ISC）、fflate、clsx、tailwind-merge（MIT）；视口单位兜底衍生自 joppuyo/large-small-dynamic-viewport-units-polyfill（MIT）。版权归各项目作者所有，完整许可证随 npm 包分发。

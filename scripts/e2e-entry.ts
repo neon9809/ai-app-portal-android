@@ -93,7 +93,7 @@ function makeCtx(overrides: Partial<SandboxContext> = {}): SandboxContext {
 }
 
 function request(method: string, params: Record<string, unknown> = {}) {
-  return { __zaowu: 1 as const, id: 1, method, params }
+  return { __aiPortal: 1 as const, id: 1, method, params }
 }
 
 const VALID_HTML = `<!doctype html>

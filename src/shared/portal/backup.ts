@@ -19,13 +19,14 @@ import {
   listGrants,
   listSnapshots,
   listTriggers,
-  settingGet,
   settingSet,
   STORE,
   kvGet,
 } from './db'
 import { uid, now } from './utils'
 
+// MAGIC / format / 扩展名沿用早期内部代号：改名会让已有备份文件无法解密与导入，
+// 开源版本不做破坏性重命名。
 const MAGIC = new Uint8Array([0x5a, 0x57, 0x42, 0x4b, 0x31]) // ZWBK1
 const PBKDF2_ITERATIONS = 310_000
 
@@ -55,8 +56,9 @@ async function collectPayload(): Promise<BackupPayload> {
   }
   const usage = await idbGetAll<unknown>(STORE.usage)
   const triggers = await listTriggers()
-  const llm = await settingGet('llm')
-  const lastBackupAt = await settingGet('lastBackupAt')
+  // 全量保存 settings：预算、应用通知偏好、引导状态与模型配置都在这一个 store 里，
+  // 只备份 llm 会让恢复后的预算与应用设置凭空消失。
+  const settings = await idbGetAll<{ key: string; value: unknown }>(STORE.settings)
 
   return {
     format: 'zaowu-backup',
@@ -66,10 +68,7 @@ async function collectPayload(): Promise<BackupPayload> {
     kv,
     grants,
     triggers,
-    settings: [
-      { key: 'llm', value: llm ?? null },
-      { key: 'lastBackupAt', value: lastBackupAt ?? null },
-    ],
+    settings,
     usage,
   }
 }

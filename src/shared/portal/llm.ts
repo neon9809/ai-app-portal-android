@@ -105,7 +105,11 @@ async function postJson(
   apiKey: string,
   body: unknown,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<{ status: number; data: unknown }> {
+  if (signal?.aborted) {
+    throw Object.assign(new Error('已取消'), { name: 'AbortError' })
+  }
   await initBridge()
   const mode = getBridgeMode()
 
@@ -127,6 +131,8 @@ async function postJson(
   // 浏览器预览：没有壳，直接 fetch。可能被目标站点 CORS 拦截。
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  const onAbort = () => controller.abort()
+  signal?.addEventListener('abort', onAbort, { once: true })
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -147,6 +153,7 @@ async function postJson(
     return { status: response.status, data }
   } finally {
     window.clearTimeout(timer)
+    signal?.removeEventListener('abort', onAbort)
   }
 }
 
@@ -174,7 +181,13 @@ function explainStatus(status: number, payload: unknown): LlmError {
 
 export async function chat(
   messages: ChatMessage[],
-  options?: { settings?: LlmSettings; model?: string; timeoutMs?: number },
+  options?: {
+    settings?: LlmSettings
+    model?: string
+    timeoutMs?: number
+    /** 用户取消生成时中断请求（真机壳请求无法中断，浏览器路径可中断） */
+    signal?: AbortSignal
+  },
 ): Promise<ChatResult> {
   const settings = options?.settings ?? (await readLlmSettings())
   if (!isLlmConfigured(settings)) {
@@ -197,11 +210,13 @@ export async function chat(
         temperature: settings.temperature,
       },
       timeoutMs,
+      options?.signal,
     )
   } catch (error) {
     if (error instanceof LlmError) throw error
     const name = (error as { name?: string })?.name
     if (name === 'AbortError') {
+      if (options?.signal?.aborted) throw error
       throw new LlmError('timeout', '模型响应超时，请稍后重试或换一个更快的模型')
     }
     const mode = getBridgeMode()
@@ -256,6 +271,8 @@ export async function chatStream(
     timeoutMs?: number
     /** 推理模型返回的思考内容（reasoning_content / reasoning / thinking） */
     onReasoning?: (delta: string) => void
+    /** 用户取消生成时中断流式读取 */
+    signal?: AbortSignal
   },
 ): Promise<ChatResult> {
   const settings = options?.settings ?? (await readLlmSettings())
@@ -267,8 +284,13 @@ export async function chatStream(
 
   const url = chatEndpoint(settings.baseUrl)
   const timeoutMs = options?.timeoutMs ?? 240_000
+  if (options?.signal?.aborted) {
+    throw Object.assign(new Error('已取消'), { name: 'AbortError' })
+  }
   const controller = new AbortController()
   const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  const onAbort = () => controller.abort()
+  options?.signal?.addEventListener('abort', onAbort, { once: true })
 
   let response: Response
   try {
@@ -288,6 +310,8 @@ export async function chatStream(
     })
   } catch (error) {
     window.clearTimeout(timer)
+    options?.signal?.removeEventListener('abort', onAbort)
+    if (options?.signal?.aborted) throw error
     throw new LlmError(
       'network',
       `流式连接失败：${(error as Error)?.message ?? '网络错误'}`,
@@ -296,6 +320,7 @@ export async function chatStream(
 
   if (!response.ok) {
     window.clearTimeout(timer)
+    options?.signal?.removeEventListener('abort', onAbort)
     const text = await response.text().catch(() => '')
     let payload: unknown = text
     try {
@@ -307,6 +332,7 @@ export async function chatStream(
   }
   if (!response.body) {
     window.clearTimeout(timer)
+    options?.signal?.removeEventListener('abort', onAbort)
     throw new LlmError('bad-response', '这个环境拿不到流式响应')
   }
 
@@ -365,11 +391,13 @@ export async function chatStream(
   } catch (error) {
     const name = (error as { name?: string })?.name
     if (name === 'AbortError') {
+      if (options?.signal?.aborted) throw error
       throw new LlmError('timeout', '模型响应超时，请稍后重试或换一个更快的模型')
     }
     throw new LlmError('network', `流式读取中断：${(error as Error)?.message ?? '网络错误'}`)
   } finally {
     window.clearTimeout(timer)
+    options?.signal?.removeEventListener('abort', onAbort)
   }
 
   if (!content.trim()) {

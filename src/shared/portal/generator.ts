@@ -636,6 +636,8 @@ function mergeIssues(staticIssues: StaticIssue[], runtime: RuntimeIssue[]): Stat
  * ------------------------------------------------------------------ */
 
 const jobs = new Map<string, GenerationJob>()
+/** 正在进行的模型请求：取消时真正中断，而不是只打一个「已取消」标记 */
+const abortControllers = new Map<string, AbortController>()
 const listeners = new Map<string, Set<(job: GenerationJob) => void>>()
 
 function emit(appId: string): void {
@@ -755,6 +757,8 @@ export function subscribeJob(appId: string, listener: (job: GenerationJob) => vo
 export function cancelJob(appId: string): void {
   const job = jobs.get(appId)
   if (!job) return
+  // 先中断在途请求，再改状态：避免用户取消后请求跑完、继续计费
+  abortControllers.get(appId)?.abort()
   patchJob(appId, { cancelled: true, phase: 'cancelled', message: '已取消' })
 }
 
@@ -830,6 +834,8 @@ async function runStreamingChat(
   let lastPush = 0
   let lastThinkPush = 0
   let received = false
+  const controller = new AbortController()
+  abortControllers.set(appId, controller)
   try {
     const result = await chatStream(
       messages,
@@ -845,6 +851,7 @@ async function runStreamingChat(
       {
         settings,
         model: settings.model,
+        signal: controller.signal,
         // 推理模型的思考过程：让用户看到模型在做什么，而不是干等
         onReasoning: (delta) => {
           received = true
@@ -861,6 +868,8 @@ async function runStreamingChat(
     return result
   } catch (error) {
     patchJob(appId, { live: '', streaming: false })
+    // 用户主动取消：不重试、不回退
+    if (controller.signal.aborted) throw new CancelledError()
     // 已经收到部分内容时不再回退重发，避免同一个请求计费两次
     if (received) throw error
     if (error instanceof LlmError && error.kind !== 'network' && error.kind !== 'bad-response') {
@@ -876,7 +885,9 @@ async function runStreamingChat(
       'warn',
       '这个环境不能逐字显示（模型服务没有开放跨域流式），正在等待完整结果，可能要几十秒到两分钟',
     )
-    return chat(messages, { settings, model: settings.model })
+    return chat(messages, { settings, model: settings.model, signal: controller.signal })
+  } finally {
+    if (abortControllers.get(appId) === controller) abortControllers.delete(appId)
   }
 }
 

@@ -38,7 +38,7 @@ const SDK_SOURCE = `
       var id = ++seq;
       pending[id] = { resolve: resolve, reject: reject };
       try {
-        parent.postMessage({ __zaowu: 1, id: id, method: method, params: params || {} }, '*');
+        parent.postMessage({ __aiPortal: 1, id: id, method: method, params: params || {} }, '*');
       } catch (error) {
         delete pending[id];
         reject(error);
@@ -48,7 +48,7 @@ const SDK_SOURCE = `
   var listeners = {};
   window.addEventListener('message', function (event) {
     var data = event.data;
-    if (!data || data.__zaowu !== 1) return;
+    if (!data || data.__aiPortal !== 1) return;
     if (data.event) {
       var handlers = listeners[data.event] || [];
       for (var i = 0; i < handlers.length; i++) {
@@ -172,7 +172,7 @@ const SDK_SOURCE = `
       navigator.sendBeacon = function () { return false; };
     }
   } catch (_) {}
-  window.__zaowuReady = true;
+  window.__aiPortalReady = true;
 })();
 `.trim()
 
@@ -246,14 +246,14 @@ export interface SandboxContext {
 }
 
 interface SandboxRequest {
-  __zaowu: 1
+  __aiPortal: 1
   id: number
   method: string
   params: Record<string, unknown>
 }
 
 export function isSandboxRequest(data: unknown): data is SandboxRequest {
-  return Boolean(data && typeof data === 'object' && (data as SandboxRequest).__zaowu === 1)
+  return Boolean(data && typeof data === 'object' && (data as SandboxRequest).__aiPortal === 1)
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -643,6 +643,8 @@ export function runSandboxProbe(html: string): Promise<RuntimeIssue[]> {
 
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.contentWindow) return
+      // 与运行页一致：只接受 srcdoc 沙箱的不透明源（"null" 或空串）
+      if (event.origin !== 'null' && event.origin !== '') return
       const data = event.data
       if (!isSandboxRequest(data)) return
       const params = data.params ?? {}
@@ -653,7 +655,7 @@ export function runSandboxProbe(html: string): Promise<RuntimeIssue[]> {
           issues.push({ level, message: String(params.message ?? '').slice(0, 500) })
         }
         frame.contentWindow?.postMessage(
-          { __zaowu: 1, reply: true, id: data.id, ok: true, result: true },
+          { __aiPortal: 1, reply: true, id: data.id, ok: true, result: true },
           '*',
         )
         return
@@ -662,7 +664,7 @@ export function runSandboxProbe(html: string): Promise<RuntimeIssue[]> {
       // 设备桥在自检环境里不存在：返回 false，让应用的「不可用」分支正常渲染
       if (data.method === 'device.available') {
         frame.contentWindow?.postMessage(
-          { __zaowu: 1, reply: true, id: data.id, ok: true, result: false },
+          { __aiPortal: 1, reply: true, id: data.id, ok: true, result: false },
           '*',
         )
         return
@@ -675,7 +677,7 @@ export function runSandboxProbe(html: string): Promise<RuntimeIssue[]> {
             ? []
             : { notifications: { enabled: false, banner: false, vibrate: false } }
         frame.contentWindow?.postMessage(
-          { __zaowu: 1, reply: true, id: data.id, ok: true, result },
+          { __aiPortal: 1, reply: true, id: data.id, ok: true, result },
           '*',
         )
         return
@@ -693,7 +695,7 @@ export function runSandboxProbe(html: string): Promise<RuntimeIssue[]> {
           result = Array.from(memory.keys())
         }
         frame.contentWindow?.postMessage(
-          { __zaowu: 1, reply: true, id: data.id, ok: true, result },
+          { __aiPortal: 1, reply: true, id: data.id, ok: true, result },
           '*',
         )
         return
@@ -701,7 +703,7 @@ export function runSandboxProbe(html: string): Promise<RuntimeIssue[]> {
 
       frame.contentWindow?.postMessage(
         {
-          __zaowu: 1,
+          __aiPortal: 1,
           reply: true,
           id: data.id,
           ok: false,
