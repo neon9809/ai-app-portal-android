@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 132" role="img" aria-label="还没有应用">
+  <rect x="18" y="34" width="144" height="80" rx="14" fill="#F2F4FA"/>
+  <rect x="30" y="22" width="54" height="54" rx="12" fill="#FFFFFF" stroke="#E2E6F0"/>
+  <g fill="#0D3CD6">
+    <circle cx="45" cy="38" r="3.4"/>
+    <circle cx="56" cy="38" r="3.4"/>
+    <circle cx="67" cy="38" r="3.4"/>
+    <circle cx="45" cy="49" r="3.4"/>
+    <circle cx="56" cy="49" r="3.4"/>
+    <circle cx="67" cy="49" r="3.4"/>
+    <circle cx="45" cy="60" r="3.4"/>
+  </g>
+  <circle cx="67" cy="60" r="3.4" fill="#C8860D"/>
+  <rect x="98" y="40" width="50" height="42" rx="10" fill="#0D3CD6"/>
+  <path d="M117 55h12M123 49v12" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"/>
+  <g fill="#C7D2F6">
+    <circle cx="118" cy="100" r="4"/>
+    <circle cx="132" cy="100" r="4"/>
+    <circle cx="146" cy="100" r="4"/>
+    <circle cx="118" cy="112" r="4"/>
+    <circle cx="132" cy="112" r="4"/>
+  </g>
+  <circle cx="146" cy="112" r="4" fill="#C8860D"/>
+</svg>

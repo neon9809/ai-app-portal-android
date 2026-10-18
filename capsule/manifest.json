@@ -1,0 +1,16 @@
+{
+  "applicationId": "ai_p_61f527aa45a4ac8d",
+  "name": "AI应用门户",
+  "version": "1.1.1",
+  "versionCode": 5,
+  "entry": "web/index.html",
+  "description": "用一句话描述需求，生成可直接使用的本地小工具",
+  "orientation": "portrait",
+  "fullscreen": false,
+  "permissions": [
+    "camera",
+    "bluetooth",
+    "record",
+    "location"
+  ]
+}

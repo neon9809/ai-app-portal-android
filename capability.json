@@ -1,0 +1,72 @@
+{
+  "admin": false,
+  "supabase": false,
+  "payment": false,
+  "appAuth": false,
+  "adminAuth": false,
+  "includes": {
+    "plugins": [],
+    "connectors": [
+      {
+        "connector_id": "ic_atomic_473",
+        "connector_name": "定位",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_468",
+        "connector_name": "文件管理",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_495",
+        "connector_name": "网络设置",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_472",
+        "connector_name": "通用原子能力",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_990007",
+        "connector_name": "定位与GNSS",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_990002",
+        "connector_name": "摄像头硬件能力",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_990015",
+        "connector_name": "蓝牙链接",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_990012",
+        "connector_name": "触觉反馈",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_990004",
+        "connector_name": "音频输出与路由",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_990003",
+        "connector_name": "麦克风与录音",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_503",
+        "connector_name": "云端天气服务",
+        "version": "1.0.0"
+      },
+      {
+        "connector_id": "ic_atomic_491",
+        "connector_name": "天气",
+        "version": "1.0.0"
+      }
+    ]
+  }
+}

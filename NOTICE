@@ -1,0 +1,30 @@
+AI应用门户（AI App Portal for Android）
+Copyright (C) 2026 AI应用门户 contributors
+
+本项目基于「AI App Portal」重写与移植：
+  github.com/neon9809/ai-app-portal
+
+原项目版权归其作者所有，依据 GNU General Public License v3.0 发布。
+
+本程序是自由软件：你可以依据自由软件基金会发布的 GNU 通用公共许可证
+（第 3 版，或你选择的任何更新版本）的条款重新分发和/或修改它。
+
+本程序的分发是希望它有用，但不提供任何担保，甚至不提供适销性或
+特定用途适用性的默示担保。详见 GNU 通用公共许可证。
+
+许可证全文见本目录的 LICENSE 文件，或：
+  gnu.org/licenses/gpl-3.0.html
+
+---
+
+第三方依赖与本工程使用的开源组件：
+
+- React、React DOM、React Router —— MIT License
+- Vite —— MIT License
+- Tailwind CSS —— MIT License
+- lucide-react（图标）—— ISC License
+- fflate（ZIP 打包）—— MIT License
+- clsx、tailwind-merge —— MIT License
+- Supabase JS Client —— MIT License
+
+各依赖的完整许可证文本随 npm 包分发，位于 node_modules/<包名>/LICENSE。

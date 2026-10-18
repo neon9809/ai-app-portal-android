@@ -1,0 +1,133 @@
+/* =============================================================================
+ * 设计 token（唯一色值来源）
+ *
+ * 品牌取自应用图标：宝蓝底 + 白色点阵 + 一个橙色点。
+ * 界面用冷调浅灰做纸面、宝蓝做主色、深橙做强调，与图标是同一套语言。
+ *
+ * 约束：
+ * 1. 字面量色值只允许出现在本文件，其它任何文件都必须使用 token 或 Tailwind 语义类。
+ * 2. token 用「空格分隔的 RGB 通道」书写，便于 Tailwind 用 rgb(var(--x) / <alpha-value>) 支持透明度。
+ * 3. 语义 token 必须成对提供前景与背景，对比度 ≥ 4.5:1（门禁 G44 会算）。
+ * 4. 只有一套配色：不写 dark: 变体、不做配色切换。
+ * ========================================================================== */
+
+:root {
+  /* ---------- 原始色阶（raw palette） ---------- */
+  --gray-0: 255 255 255;
+  --gray-50: 249 250 253;
+  --gray-100: 242 244 250;
+  --gray-150: 235 238 246;
+  --gray-200: 226 230 240;
+  --gray-300: 208 214 226;
+  --gray-400: 154 163 180;
+  --gray-500: 112 121 138;
+  --gray-550: 95 105 122;
+  --gray-700: 70 78 94;
+  --gray-800: 46 52 66;
+  --gray-850: 31 36 47;
+  --gray-900: 23 27 36;
+  --gray-950: 14 17 24;
+  --gray-1000: 0 0 0;
+
+  --brand-50: 232 237 255;
+  --brand-100: 211 221 255;
+  --brand-300: 138 162 255;
+  --brand-600: 13 60 214;
+  --brand-700: 10 48 176;
+  --brand-900: 8 32 110;
+
+  --orange-100: 252 240 219;
+  --orange-600: 200 134 13;
+  --orange-700: 135 72 8;
+
+  --green-800: 22 101 52;
+  --amber-800: 146 64 14;
+  --red-700: 185 28 28;
+
+  /* ---------- 语义 token（明色主题） ---------- */
+  --background: var(--gray-50);
+  --foreground: 23 27 36;
+
+  --surface: var(--gray-0);
+  --surface-foreground: 23 27 36;
+  --surface-muted: var(--gray-100);
+
+  --muted: var(--gray-100);
+  /* 次要文字：在 background / surface / muted 三种底上都 ≥4.5:1 */
+  --muted-foreground: var(--gray-550);
+
+  --primary: var(--brand-600);
+  --primary-foreground: var(--gray-0);
+  --primary-soft: var(--brand-50);
+
+  --secondary: var(--gray-150);
+  --secondary-foreground: 46 52 66;
+
+  --accent: var(--gray-100);
+  --accent-foreground: 31 36 47;
+
+  /* 强调色：进度、序号、关键点缀。只做小面积使用。 */
+  --spark: var(--orange-700);
+  --spark-foreground: var(--gray-0);
+  --spark-soft: var(--orange-100);
+  /* 深色底上的品牌橙（启动引导的点阵高亮） */
+  --spark-bright: var(--orange-600);
+
+  --success: var(--green-800);
+  --success-foreground: var(--gray-0);
+  --warning: var(--amber-800);
+  --warning-foreground: var(--gray-0);
+  --danger: var(--red-700);
+  --danger-foreground: var(--gray-0);
+
+  --border: var(--gray-200);
+  --input: 218 223 234;
+  --ring: var(--brand-600);
+  --overlay: 14 17 24;
+
+  /* ---------- 形状 ---------- */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  --hairline: 0.5px;
+
+  --shadow-sm: 0 1px 2px 0 rgb(20 24 40 / 0.06);
+  --shadow-md: 0 4px 12px -2px rgb(20 24 40 / 0.1);
+  --shadow-lg: 0 12px 32px -8px rgb(20 24 40 / 0.18);
+
+  /* ---------- 字体与排版 ---------- */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'HarmonyOS Sans SC', 'PingFang SC',
+    'Noto Sans CJK SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --text-caption: 12px;
+  --leading-caption: 16px;
+  --text-body: 14px;
+  --leading-body: 22px;
+  --text-title: 16px;
+  --leading-title: 22px;
+  --text-display: 20px;
+  --leading-display: 28px;
+  /* 应用图标里的 emoji 尺寸：只用于图标块，不用于正文 */
+  --text-emoji: 26px;
+  --leading-emoji: 30px;
+
+  /* ---------- 布局尺寸（App UI） ---------- */
+  --navbar-height: 44px;
+  --tabbar-height: 56px;
+  --tap-min: 44px;
+
+  /* ---------- 动效 ---------- */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* ---------- 安全区 ---------- */
+  --safe-top: var(--sat, env(safe-area-inset-top, 0px));
+  --safe-bottom: var(--sab, env(safe-area-inset-bottom, 0px));
+  --safe-left: var(--sal, env(safe-area-inset-left, 0px));
+  --safe-right: var(--sar, env(safe-area-inset-right, 0px));
+}

@@ -1,0 +1,22 @@
+node_modules
+dist
+dist-ssr
+.DS_Store
+*.local
+*.log
+.env
+.env.local
+.vite
+.open-source-snapshot
+
+# 签名证书：dist/ 已忽略，这里忽略源码目录里的私钥与口令配置，避免误提交
+capsule/signing/*
+!capsule/signing/.gitkeep
+
+# 平台内部元数据与开发约束：不属于开源仓库内容
+.app-login
+.product-type
+.project-type
+.project-basekit
+AGENTS.md
+CLAUDE.md
