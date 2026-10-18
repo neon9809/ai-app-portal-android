@@ -1,0 +1,13 @@
+# 调试签名配置示例
+#
+# 默认不需要手动创建：scripts/gen-debug-signing.mjs 会在缺失时自动生成
+# 一份随机口令的 capsule.properties。只有想使用固定口令时才复制本文件：
+#
+#   cp capsule/signing/capsule.properties.example capsule/signing/capsule.properties
+#
+# 注意：capsule.properties 已被 .gitignore 忽略，不要提交真实口令；
+# 调试证书不能用于应用商店上架。
+
+storePassword=changeit
+keyAlias=debug
+keyPassword=changeit

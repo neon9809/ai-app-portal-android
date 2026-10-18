@@ -56,7 +56,9 @@ function keep(relative) {
   if (relative.endsWith('.log') || relative.endsWith('.local')) return false
   if (relative === path.join('capsule', 'signing')) return true
   if (relative.startsWith(`${path.join('capsule', 'signing')}${path.sep}`)) {
-    return relative === path.join('capsule', 'signing', '.gitkeep')
+    // 只放行占位文件与示例配置；证书、口令与真实签名一律不进快照
+    const name = path.basename(relative)
+    return name === '.gitkeep' || name.endsWith('.example')
   }
   return true
 }
