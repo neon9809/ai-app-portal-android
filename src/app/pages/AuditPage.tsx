@@ -40,7 +40,7 @@ export function AuditPage() {
   if (records === null) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
-        <Spinner />
+        <Spinner label="正在读取日志" />
       </div>
     )
   }

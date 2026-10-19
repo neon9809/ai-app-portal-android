@@ -124,6 +124,8 @@
   --duration-fast: 120ms;
   --duration-base: 200ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  /* 轻微过冲，只用于一次性的“出现/完成”动画（卡片弹入、勾选、杯子填充），不用于持续运动 */
+  --ease-spring: cubic-bezier(0.18, 0.89, 0.24, 1.08);
 
   /* ---------- 安全区 ---------- */
   --safe-top: var(--sat, env(safe-area-inset-top, 0px));

@@ -271,7 +271,7 @@ export function AppDetailPage() {
   if (app === undefined) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
-        <Spinner />
+        <Spinner label="正在打开工具" />
       </div>
     )
   }

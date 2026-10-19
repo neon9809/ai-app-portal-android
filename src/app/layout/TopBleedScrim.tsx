@@ -39,9 +39,11 @@ export function TopBleedScrim({ scroller }: { scroller: RefObject<HTMLElement | 
         return
       }
       const anchor = scrollEl.querySelector<HTMLElement>('[data-top-bleed-content]')
+      // AppShell 在 Outlet 外还有一层换页动画容器；兜底取它内部的第一个块
+      const firstBlock = scrollEl.firstElementChild?.firstElementChild ?? scrollEl.firstElementChild
       const contentTop = anchor
         ? anchor.getBoundingClientRect().top
-        : (scrollEl.firstElementChild?.getBoundingClientRect().bottom ?? safeTop)
+        : (firstBlock?.getBoundingClientRect().bottom ?? safeTop)
       const progress = Math.min(Math.max((safeTop - contentTop) / safeTop, 0), 1)
       layer.style.opacity = String(progress)
     }

@@ -48,15 +48,15 @@ export function RunnerPage() {
 
   if (app === undefined) {
     return (
-      <div className="flex h-screen-dvh items-center justify-center bg-background">
-        <Spinner />
+      <div className="page-enter flex h-screen-dvh items-center justify-center bg-background">
+        <Spinner label="正在打开工具" />
       </div>
     )
   }
 
   if (app === null) {
     return (
-      <div className="flex h-screen-dvh flex-col bg-background">
+      <div className="page-enter flex h-screen-dvh flex-col bg-background">
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
             title="找不到这个应用"
@@ -69,7 +69,7 @@ export function RunnerPage() {
   }
 
   return (
-    <div className="flex h-screen-dvh flex-col bg-background text-foreground">
+    <div className="page-enter flex h-screen-dvh flex-col bg-background text-foreground">
       <header className="shrink-0 border-b border-border bg-surface pt-safe-top">
         <div className="flex h-11 items-center gap-1 px-2">
           <button
@@ -81,7 +81,10 @@ export function RunnerPage() {
             <ChevronLeft className="size-6" aria-hidden />
           </button>
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="text-display leading-none" aria-hidden>
+            <span
+              className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary-soft text-body"
+              aria-hidden
+            >
               {app.emoji}
             </span>
             <span className="truncate text-body font-medium">{app.name}</span>

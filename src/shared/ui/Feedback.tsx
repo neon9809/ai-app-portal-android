@@ -1,15 +1,20 @@
-import { Loader2, type LucideIcon } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { Button } from './Button'
+import { DotTile, DotWave } from './Dot'
 
-export function Spinner({ className }: { className?: string }) {
-  return <Loader2 className={cn('size-5 animate-spin text-muted-foreground', className)} aria-hidden />
+/**
+ * 页面级加载：九点呼吸（品牌点阵），不是转圈。
+ * 名字保持 `Spinner` 是为了不打断既有调用点；视觉已经统一到点阵语言。
+ */
+export function Spinner({ className, label }: { className?: string; label?: string }) {
+  return <DotWave label={label} className={className} />
 }
 
-/** 骨架屏：列表/卡片加载占位。比 Spinner 更能减少布局抖动。 */
+/** 骨架屏：扫光比纯闪烁更像「正在准备内容」，也不制造额外的注意力。 */
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn('animate-pulse rounded-md bg-muted', className)} aria-hidden />
+  return <div className={cn('skeleton rounded-md', className)} aria-hidden />
 }
 
 export function SkeletonList({ rows = 3 }: { rows?: number }) {
@@ -50,12 +55,12 @@ export function EmptyState({
     <div className={cn('flex flex-col items-center justify-center px-6 py-12 text-center', className)}>
       {illustration ? (
         <div className="mb-4">{illustration}</div>
+      ) : Icon ? (
+        <div className="mb-3 flex size-14 items-center justify-center rounded-lg bg-primary-soft">
+          <Icon className="size-7 text-primary" aria-hidden />
+        </div>
       ) : (
-        Icon && (
-          <div className="mb-3 flex size-14 items-center justify-center rounded-full bg-muted">
-            <Icon className="size-7 text-muted-foreground" aria-hidden />
-          </div>
-        )
+        <DotTile size="lg" className="mb-4" />
       )}
       <p className="text-title font-medium">{title}</p>
       {description && <p className="mt-1 max-w-sm text-caption text-muted-foreground">{description}</p>}

@@ -68,7 +68,7 @@ export function UsagePage() {
   if (usage === null) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
-        <Spinner />
+        <Spinner label="正在统计用量" />
       </div>
     )
   }

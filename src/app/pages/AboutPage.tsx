@@ -1,7 +1,8 @@
-import { Code2, Info, ShieldCheck } from 'lucide-react'
+import { Code2, ShieldCheck } from 'lucide-react'
 
 import { usePageTitle } from '@/app/layout/PageTitle'
 import { APP_NAME, APP_VERSION } from '@/shared/config/app'
+import { DotField, DotTile } from '@/shared/ui/Dot'
 
 /**
  * 关于：版本、代码来源与许可、能力说明。
@@ -12,14 +13,10 @@ export function AboutPage() {
 
   return (
     <div className="page space-y-3">
-      <section className="rounded-lg border border-border bg-surface p-4">
-        <div className="flex items-start gap-3">
-          <span
-            className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary"
-            aria-hidden
-          >
-            <Info className="size-6" />
-          </span>
+      <section className="relative overflow-hidden rounded-xl border border-border bg-surface p-4">
+        <DotField className="absolute -right-2 -top-2 text-primary" rows={4} cols={5} />
+        <div className="relative flex items-start gap-3">
+          <DotTile size="lg" />
           <div className="min-w-0 flex-1">
             <h2 className="text-title font-semibold">{APP_NAME}</h2>
             <p className="mt-0.5 text-caption text-muted-foreground">

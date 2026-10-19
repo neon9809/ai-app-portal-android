@@ -118,6 +118,13 @@
   }
 }
 
+/* 嵌在圆角卡片里的无边框输入框：不画自己的方形 focus ring，
+ * 聚焦状态由外层卡片的 focus-within 表达，避免直角蓝框破坏圆角。 */
+.field-plain:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 @layer utilities {
   /* 安全区工具类 */
   .pt-safe-top {
@@ -141,7 +148,7 @@
   }
 
   .animate-dialog-in {
-    animation: dialog-in var(--duration-base) var(--ease-standard);
+    animation: dialog-in 280ms var(--ease-spring);
   }
 
   .animate-fade-in {
@@ -179,27 +186,33 @@
   }
 }
 
-/* 启动引导：点阵逐个亮起 + 卡片浮入 */
-@keyframes onboarding-dot-in {
-  from {
-    opacity: 0;
-    transform: scale(0.2);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* =============================================================================
+ * 启动引导：点阵叙事
+ *
+ * 品牌语言是「点阵 + 一个橙点」，整段引导里点阵就是主角：
+ * 输入时响应涟漪 → 生成时排成轨道、橙点逐个接力 → 完成时收拢 → 结果卡片弹入。
+ * 动画只用 transform / opacity（走合成器，不改布局）；每个点的位置层与
+ * 呼吸层分开，避免两处 transform 互相覆盖。
+ * ========================================================================== */
+
+/* 整屏入场 / 退场 */
+.onboarding-shell {
+  animation: onboarding-shell-in 420ms var(--ease-standard) both;
 }
 
-@keyframes onboarding-card-in {
+@keyframes onboarding-shell-in {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: scale(0.992);
   }
   to {
     opacity: 1;
     transform: none;
   }
+}
+
+.onboarding-closing {
+  animation: onboarding-fade-out 240ms ease both;
 }
 
 @keyframes onboarding-fade-out {
@@ -208,27 +221,242 @@
   }
 }
 
-.onboarding-dot {
-  animation: onboarding-dot-in 420ms var(--ease-standard) both;
+/* 舞台：点阵的活动范围 */
+.onboarding-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 168px;
+  height: 168px;
+  margin-inline: auto;
 }
 
-.onboarding-card {
-  animation: onboarding-card-in 420ms var(--ease-standard) both;
+/* 舞台底光：缓慢呼吸，让点阵不悬空 */
+.onboarding-stage-glow {
+  position: absolute;
+  inset: 20%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgb(var(--primary-foreground) / 0.16), transparent 70%);
+  animation: onboarding-glow 3.8s ease-in-out infinite alternate;
 }
 
-.onboarding-closing {
-  animation: onboarding-fade-out 240ms ease both;
+@keyframes onboarding-glow {
+  from {
+    opacity: 0.4;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 0.9;
+    transform: scale(1.06);
+  }
 }
 
-/* 引导页点阵里的品牌橙点：直接写在这里，避免依赖运行时 JIT 是否已生成类 */
-.onboarding-dot-accent {
+/* 点阵容器：ring 状态下整体旋转（生成中） */
+.onboarding-dots {
+  position: absolute;
+  inset: 0;
+}
+
+.onboarding-dots-ring {
+  animation: onboarding-orbit 5.2s linear infinite;
+}
+
+@keyframes onboarding-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 位置层：transform 由内联样式按布局给出，transition 让点自己飞到新位置 */
+.onboarding-dot-pos {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  transition:
+    transform 560ms var(--ease-standard),
+    opacity 420ms var(--ease-standard);
+  will-change: transform;
+}
+
+/* 点本体：只负责呼吸与颜色；和位置层分开，避免 transform 打架 */
+.onboarding-dot-core {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background-color: rgb(var(--primary-foreground) / 0.88);
+  animation: onboarding-breathe 2.8s ease-in-out infinite alternate;
+}
+
+.onboarding-dot-core-accent {
   background-color: rgb(var(--spark-bright));
+  /* 橙点是主角：只做缩放呼吸，不跟着压暗 */
+  animation-name: onboarding-accent-pulse;
+}
+
+@keyframes onboarding-accent-pulse {
+  from {
+    transform: scale(0.86);
+  }
+  to {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes onboarding-breathe {
+  from {
+    opacity: 0.82;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 输入涟漪：敲字 / 选例子时从中心荡开 */
+.onboarding-ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border: 1.5px solid rgb(var(--primary-foreground) / 0.5);
+  border-radius: 9999px;
+  pointer-events: none;
+  animation: onboarding-ripple 760ms var(--ease-standard) both;
+}
+
+@keyframes onboarding-ripple {
+  from {
+    opacity: 0.7;
+    transform: scale(0.45);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.05);
+  }
+}
+
+/* 场景入场 */
+.onboarding-scene {
+  animation: onboarding-scene-in 440ms var(--ease-standard) both;
+}
+
+@keyframes onboarding-scene-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.988);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 生成中 / 结果卡片从下方浮起 */
+.onboarding-rise {
+  animation: onboarding-rise 480ms var(--ease-standard) both;
+}
+
+@keyframes onboarding-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 示例应用卡片：带一点回弹的弹入，衔接点阵收拢 */
+.onboarding-app-in {
+  animation: onboarding-app-in 560ms var(--ease-spring) both;
+}
+
+@keyframes onboarding-app-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 勾选 / 杯子填充 / 完成标记：一次性的回弹 */
+.onboarding-pop {
+  animation: onboarding-pop 340ms var(--ease-spring) both;
+}
+
+@keyframes onboarding-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  62% {
+    opacity: 1;
+    transform: scale(1.14);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 完成时从点阵中心散开的粒子 */
+.onboarding-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+}
+
+.onboarding-burst-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 9999px;
+  background-color: rgb(var(--primary) / 0.75);
+  animation: onboarding-burst 780ms var(--ease-standard) both;
+}
+
+@keyframes onboarding-burst {
+  from {
+    opacity: 0.95;
+    transform: translate(0, 0) scale(0.35);
+  }
+  to {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(1);
+  }
+}
+
+/* 背景点阵：极慢呼吸，不抢主体 */
+.onboarding-ambient {
+  animation: onboarding-ambient 9s ease-in-out infinite alternate;
+}
+
+@keyframes onboarding-ambient {
+  from {
+    opacity: 0.055;
+  }
+  to {
+    opacity: 0.12;
+  }
 }
 
 @keyframes dialog-in {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(16px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -252,6 +480,127 @@
   to {
     transform: none;
   }
+}
+
+/* =============================================================================
+ * 全站点阵语言：加载 / 页面切换 / 骨架屏 / Toast 进度
+ * 动画只用 opacity / transform，颜色一律走 token。
+ * ========================================================================== */
+
+/* 九点呼吸：橙点不参与（和引导页同一套规则） */
+@keyframes dot-wave {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.7);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dot-wave-core {
+  animation: dot-wave 1.2s ease-in-out infinite;
+}
+
+/* 按钮内三点脉冲 */
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.dot-pulse-core {
+  animation: dot-pulse 900ms ease-in-out infinite;
+}
+
+/* 生成进度条：填充部分扫过一道高光 */
+@keyframes progress-shine {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.progress-shine {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--primary-foreground) / 0.35),
+    transparent
+  );
+  animation: progress-shine 1.6s ease-in-out infinite;
+}
+
+/* 页面切换：只做透明度过渡。
+ * 这里刻意不用 transform / filter：它们会给内部 position: fixed 的底部输入栏
+ * 和弹窗创建包含块，导致这些元素相对页面容器定位、随滚动漂移。 */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.page-enter {
+  animation: page-enter 280ms var(--ease-standard);
+}
+
+/* 骨架屏：比 animate-pulse 更明显的扫光 */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: rgb(var(--muted));
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--surface) / 0.72),
+    transparent
+  );
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Toast 底部倒计时：时长由内联 animationDuration 决定 */
+@keyframes toast-progress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.toast-progress {
+  transform-origin: left;
+  animation-name: toast-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,6 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes } from 'react'
-import { Loader2 } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
+import { DotPulse } from './Dot'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'danger-ghost'
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon'
@@ -56,7 +56,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       )}
       {...props}
     >
-      {loading && <Loader2 className="size-4 animate-spin" aria-hidden />}
+      {loading && <DotPulse />}
       {children}
     </button>
   )

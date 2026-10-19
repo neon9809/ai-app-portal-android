@@ -33,6 +33,11 @@ export function AppShell() {
     setMenuOpen(false)
   }, [pathname])
 
+  // 换页回到顶部：新页面不应该继承上一页的滚动位置
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 })
+  }, [pathname])
+
   // 「顶部穿透」与顶栏二选一（首页始终有顶栏，不存在这个组合）
   useEffect(() => {
     if (import.meta.env.DEV && hasHeader && topBleed) {
@@ -67,7 +72,9 @@ export function AppShell() {
               </button>
             )}
 
-            <h1 className="flex-1 truncate text-title font-semibold">{title}</h1>
+            <h1 key={title} className="animate-fade-in flex-1 truncate text-title font-semibold">
+              {title}
+            </h1>
 
             {isHome && (
               <button
@@ -88,7 +95,9 @@ export function AppShell() {
         className={cn('min-h-0 flex-1 scroll-y', !hasHeader && !topBleed && 'safe-top-backdrop')}
       >
         <PageTitleProvider onChange={setPageTitle} onTopBleedChange={setTopBleed}>
-          <Outlet />
+          <div key={pathname} className="page-enter">
+            <Outlet />
+          </div>
         </PageTitleProvider>
       </main>
 

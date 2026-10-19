@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { AlertTriangle, CheckCircle2, Info, XCircle } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'danger'
@@ -44,6 +44,13 @@ const TONE_CLASS = {
   success: 'text-success',
   warning: 'text-warning',
   danger: 'text-danger',
+} as const
+
+const TONE_BAR = {
+  info: 'bg-primary',
+  success: 'bg-success',
+  warning: 'bg-warning',
+  danger: 'bg-danger',
 } as const
 
 /**
@@ -93,8 +100,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div
               key={item.id}
               className={cn(
-                'animate-slide-up pointer-events-auto flex w-full max-w-sm items-start gap-2.5',
-                'rounded-md border border-border bg-surface p-3 shadow-md',
+                'animate-slide-up pointer-events-auto relative flex w-full max-w-sm items-start gap-2.5',
+                'overflow-hidden rounded-md border border-border bg-surface p-3 shadow-md',
               )}
             >
               <Icon className={cn('mt-0.5 size-4 shrink-0', TONE_CLASS[item.tone])} aria-hidden />
@@ -110,8 +117,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 className="-m-2 flex size-11 shrink-0 items-center justify-center rounded text-muted-foreground active:bg-accent"
                 aria-label="关闭提示"
               >
-                ✕
+                <X className="size-4" aria-hidden />
               </button>
+              {item.duration > 0 && (
+                <span className="absolute inset-x-0 bottom-0 h-0.5" aria-hidden>
+                  <span
+                    className={cn('toast-progress block h-full', TONE_BAR[item.tone])}
+                    style={{ animationDuration: `${item.duration}ms` }}
+                  />
+                </span>
+              )}
             </div>
           )
         })}

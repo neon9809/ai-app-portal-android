@@ -38,7 +38,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-overlay/50 md:items-center"
+      className="animate-fade-in fixed inset-0 z-50 flex items-end justify-center bg-overlay/50 md:items-center"
       role="presentation"
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose()

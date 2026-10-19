@@ -107,6 +107,11 @@ export default {
         fast: '120ms',
         base: '200ms',
       },
+      // 与 tokens.css 的 --ease-* 对齐，让 `ease-standard` / `ease-spring` 真正生效
+      transitionTimingFunction: {
+        standard: 'var(--ease-standard)',
+        spring: 'var(--ease-spring)',
+      },
     },
   },
   plugins: [],

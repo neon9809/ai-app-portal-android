@@ -2,10 +2,10 @@ import { useEffect, useRef, useState, type RefObject } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
+  ArrowUpRight,
   Check,
   ChevronDown,
   CircleSlash,
-  Loader2,
   Paperclip,
   RefreshCw,
   RotateCcw,
@@ -37,6 +37,7 @@ import type {
 } from '@/shared/portal/types'
 import { formatDateTime, now, uid } from '@/shared/portal/utils'
 import { Button } from '@/shared/ui/Button'
+import { DotMark, DotPulse } from '@/shared/ui/Dot'
 import { Spinner } from '@/shared/ui/Feedback'
 import { useToast } from '@/shared/ui/Toast'
 
@@ -51,6 +52,9 @@ const RUNNING_PHASES: GenerationJob['phase'][] = [
 const MAX_IMAGES = 2
 const MAX_IMAGE_BYTES = 800_000
 const MAX_TEXT_BYTES = 50_000
+
+/** 一键填入的起步示例：和首次引导里的例子保持一致 */
+const EXAMPLE_BRIEFS = ['记每天喝了几杯水', '做个没有广告的番茄钟']
 
 function bytesToDataUrl(bytes: Uint8Array, name: string): Promise<string> {
   const mime = /\.png$/i.test(name)
@@ -104,7 +108,17 @@ export function StudioPage() {
     let alive = true
     void (async () => {
       try {
-        if (!requestedAppId) return
+        if (!requestedAppId) {
+          // 从「继续开发」切回「新建」：清掉上一个应用的上下文，避免旧应用一直挂在页面上
+          if (!alive) return
+          setApp(null)
+          setBrief('')
+          setFeedback('')
+          setAttachments([])
+          setJob(undefined)
+          setError(null)
+          return
+        }
         const apps = await listApps()
         const draft = apps.find((item) => item.id === requestedAppId)
         if (!alive || !draft) return
@@ -338,7 +352,7 @@ export function StudioPage() {
   if (loading) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
-        <Spinner />
+        <Spinner label="正在准备" />
       </div>
     )
   }
@@ -386,6 +400,7 @@ export function StudioPage() {
           )}
 
           <header className="pb-4">
+            <DotMark size="md" className="mb-3" />
             <h1 className="text-display font-semibold">想做点什么？</h1>
             <p className="mt-1 text-body text-muted-foreground">
               一句话描述就行，数据怎么存、要不要联网由它判断。
@@ -410,22 +425,45 @@ export function StudioPage() {
           <p className="mt-3 text-center text-caption text-muted-foreground">
             需要图片或文件作为参考时，可以添加附件。
           </p>
+
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <span className="text-caption text-muted-foreground">试试</span>
+            {EXAMPLE_BRIEFS.map((example) => (
+              <button
+                key={example}
+                type="button"
+                onClick={() => setBrief(example)}
+                className="min-h-tap rounded-full border border-border bg-surface px-3.5 text-caption text-foreground shadow-sm transition-colors duration-fast ease-standard active:bg-accent"
+              >
+                {example}
+              </button>
+            ))}
+          </div>
         </>
       )}
 
       {/* 纯聊天式对话流：需求 → 生成过程 → 每次修改与过程 */}
       {(hasHtml || generating) && (
         <div>
-          {hasHtml && (
-            <header className="flex items-center gap-2 pb-3">
-              <span className="text-emoji leading-none" aria-hidden>
-                {app?.emoji}
+          {hasHtml && app && (
+            <section className="mb-3 flex items-center gap-3 rounded-xl border border-border bg-surface p-3 shadow-sm">
+              <span
+                className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-emoji"
+                aria-hidden
+              >
+                {app.emoji}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-body font-medium">{app?.name}</p>
-                <p className="truncate text-caption text-muted-foreground">{app?.description}</p>
+                <p className="truncate text-body font-medium">{app.name}</p>
+                <p className="line-clamp-1 text-caption text-muted-foreground">
+                  {app.description}
+                </p>
               </div>
-            </header>
+              <Button onClick={() => navigate(`/app/${app.id}`)}>
+                打开
+                <ArrowUpRight className="size-4" aria-hidden />
+              </Button>
+            </section>
           )}
 
           <div className="space-y-3">
@@ -468,9 +506,11 @@ export function StudioPage() {
 
             {generating && (
               <p className="text-center text-caption text-muted-foreground">
-                {!job?.live && !job?.thinking
-                  ? `模型还没开始输出，已等待 ${elapsed} 秒…`
-                  : '生成期间建议保持门户在前台；切到后台可能被系统暂停。'}
+                {job && ['checking', 'repairing', 'saving'].includes(job.phase)
+                  ? '代码写完了，正在做最后的检查与保存。'
+                  : !job?.live && !job?.thinking
+                    ? `模型还没开始输出，已等待 ${elapsed} 秒…`
+                    : '生成期间建议保持门户在前台；切到后台可能被系统暂停。'}
               </p>
             )}
 
@@ -479,7 +519,7 @@ export function StudioPage() {
           </div>
 
           {!generating && (
-            <div className="fixed inset-x-0 bottom-0 z-10 bg-background px-4 pb-safe-bottom pt-2">
+            <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background px-4 pb-safe-bottom pt-2">
               <div className="mx-auto w-full max-w-[640px]">
                 <Composer
                   value={feedback}
@@ -531,13 +571,13 @@ function Composer({
   loading: boolean
 }) {
   return (
-    <section className="rounded-xl border border-border bg-surface p-2 shadow-sm">
+    <section className="rounded-xl border border-border bg-surface p-2 shadow-sm transition-colors duration-fast focus-within:border-primary/40">
       <textarea
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={rows}
         placeholder={placeholder}
-        className="w-full resize-none bg-transparent px-2 py-2 text-body outline-none"
+        className="field-plain w-full resize-none bg-transparent px-2 py-2 text-body placeholder:text-muted-foreground"
       />
 
       {attachments.length > 0 && (
@@ -616,11 +656,16 @@ function AssistantTurn({
     <div className="flex justify-start">
       <div className="w-full rounded-lg border border-border bg-surface p-3">
         <div className="flex items-center gap-2">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary-soft">
+          <span
+            className={cn(
+              'flex size-7 shrink-0 items-center justify-center rounded-md',
+              running ? 'bg-primary-soft' : 'bg-success/10',
+            )}
+          >
             {running ? (
-              <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
+              <DotPulse className="text-primary" />
             ) : (
-              <Sparkles className="size-4 text-primary" aria-hidden />
+              <Check className="size-4 text-success" strokeWidth={3} aria-hidden />
             )}
           </span>
           <p className="min-w-0 flex-1 truncate text-body font-medium">{title}</p>
@@ -628,17 +673,27 @@ function AssistantTurn({
         </div>
 
         {running && typeof progress === 'number' && (
-          <div
-            className="mt-2 h-1 overflow-hidden rounded-full bg-muted"
-            role="progressbar"
-            aria-valuenow={progress}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          >
+          <div className="mt-3">
+            <div className="flex items-baseline justify-between text-caption text-muted-foreground">
+              <span>生成进度</span>
+              <span className="tabular-nums text-foreground">
+                {Math.max(0, Math.min(100, Math.round(progress)))}%
+              </span>
+            </div>
             <div
-              className="h-full rounded-full bg-primary transition-[width] duration-200"
-              style={{ width: `${Math.max(4, progress)}%` }}
-            />
+              className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"
+              role="progressbar"
+              aria-valuenow={Math.round(progress)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className="relative h-full overflow-hidden rounded-full bg-primary transition-[width] duration-300"
+                style={{ width: `${Math.max(4, Math.min(100, progress))}%` }}
+              >
+                <span className="progress-shine" aria-hidden />
+              </div>
+            </div>
           </div>
         )}
 
@@ -674,10 +729,12 @@ function AssistantTurn({
         )}
 
         {running && onCancel && (
-          <Button variant="ghost" size="sm" className="mt-2" onClick={onCancel}>
-            <X className="size-3.5" aria-hidden />
-            取消
-          </Button>
+          <div className="mt-2 flex justify-end border-t border-border pt-2">
+            <Button variant="ghost" size="sm" onClick={onCancel}>
+              <X className="size-3.5" aria-hidden />
+              停止生成
+            </Button>
+          </div>
         )}
 
         {!running && onRollback && (
@@ -710,7 +767,9 @@ function ChatBubble({
       <div
         className={cn(
           'max-w-[86%] rounded-lg px-3 py-2 text-body',
-          isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground',
+          isUser
+            ? 'rounded-br-sm bg-primary text-primary-foreground'
+            : 'rounded-bl-sm bg-muted text-foreground',
         )}
       >
         <p className="whitespace-pre-wrap break-words">{text}</p>
@@ -744,7 +803,7 @@ function previewLive(live: string): string {
 
 function StepIcon({ status }: { status: JobStep['status'] }) {
   if (status === 'done') return <Check className="size-4 text-success" aria-hidden />
-  if (status === 'active') return <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
+  if (status === 'active') return <DotPulse className="text-primary" />
   if (status === 'warn') return <AlertTriangle className="size-4 text-warning" aria-hidden />
   if (status === 'error') return <CircleSlash className="size-4 text-danger" aria-hidden />
   return <span className="size-4 rounded-full border border-border" aria-hidden />
@@ -784,7 +843,7 @@ function StepList({
 
   return (
     <ol className="space-y-0.5">
-      {steps.map((step) => {
+      {steps.map((step, index) => {
         const open = expanded.includes(step.id)
         const seconds =
           step.status === 'active' && step.startedAt
@@ -793,14 +852,22 @@ function StepList({
               ? Math.max(0, Math.round((step.finishedAt - step.startedAt) / 1000))
               : 0
         return (
-          <li key={step.id}>
+          <li key={step.id} className="relative">
+            {index < steps.length - 1 && (
+              <span
+                className="absolute left-2 top-7 h-[calc(100%-12px)] w-px bg-border"
+                aria-hidden
+              />
+            )}
             <button
               type="button"
               onClick={() => toggle(step.id)}
               aria-expanded={open}
               className="flex min-h-tap w-full items-center gap-2 text-left"
             >
-              <StepIcon status={step.status} />
+              <span className="relative z-10 grid size-4 shrink-0 place-items-center rounded-full bg-surface">
+                <StepIcon status={step.status} />
+              </span>
               <span
                 className={cn(
                   'min-w-0 flex-1 truncate text-body',
@@ -866,28 +933,34 @@ function StepList({
                   </div>
                 ))}
                 {step.id === 'write' && thinking && (
-                  <div className="mt-1">
-                    <div className="flex items-center gap-1.5 text-caption text-muted-foreground">
-                      <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
-                      模型思考（实时）
+                  <div className="mt-2 overflow-hidden rounded-lg bg-foreground">
+                    <div className="flex items-center gap-2 border-b border-background/10 px-2.5 py-1.5">
+                      <span
+                        className="dot-pulse-core size-1.5 rounded-full bg-spark-bright"
+                        aria-hidden
+                      />
+                      <span className="text-caption font-medium text-background/85">模型思考 · 实时</span>
                     </div>
                     <pre
                       ref={thinkingRef}
-                      className="mt-1 max-h-[30dvh] overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2 text-caption leading-relaxed text-muted-foreground"
+                      className="max-h-[30dvh] overflow-y-auto whitespace-pre-wrap break-words p-2.5 text-caption leading-relaxed text-background/65"
                     >
                       {thinking}
                     </pre>
                   </div>
                 )}
                 {step.id === 'write' && live && (
-                  <div className="mt-1">
-                    <div className="flex items-center gap-1.5 text-caption text-muted-foreground">
-                      <span className="size-1.5 animate-pulse rounded-full bg-primary" aria-hidden />
-                      模型输出（实时）
+                  <div className="mt-2 overflow-hidden rounded-lg bg-foreground">
+                    <div className="flex items-center gap-2 border-b border-background/10 px-2.5 py-1.5">
+                      <span
+                        className="dot-pulse-core size-1.5 rounded-full bg-spark-bright"
+                        aria-hidden
+                      />
+                      <span className="text-caption font-medium text-background/85">正在写代码 · 实时</span>
                     </div>
                     <pre
                       ref={liveRef}
-                      className="mt-1 max-h-[40dvh] overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-muted p-2 font-mono text-caption leading-relaxed text-muted-foreground"
+                      className="max-h-[40dvh] overflow-y-auto whitespace-pre-wrap break-all p-2.5 font-mono text-caption leading-relaxed text-background/75"
                     >
                       {previewLive(live)}
                     </pre>

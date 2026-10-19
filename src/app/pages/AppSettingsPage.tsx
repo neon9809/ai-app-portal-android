@@ -79,7 +79,7 @@ export function AppSettingsPage() {
   if (app === undefined || settings === null) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
-        <Spinner />
+        <Spinner label="正在读取设置" />
       </div>
     )
   }

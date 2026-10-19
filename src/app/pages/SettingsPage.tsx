@@ -11,10 +11,19 @@ import {
 } from 'lucide-react'
 
 import { usePageTitle } from '@/app/layout/PageTitle'
-import { APP_VERSION } from '@/shared/config/app'
+import { APP_NAME, APP_VERSION } from '@/shared/config/app'
+import { cn } from '@/shared/lib/cn'
 import { listApps, listAudit, listUsage, settingGet } from '@/shared/portal/db'
 import { isLlmConfigured, readLlmSettings } from '@/shared/portal/llm'
 import { formatRelativeTime } from '@/shared/portal/utils'
+import { DotField, DotTile } from '@/shared/ui/Dot'
+
+const GUIDE_STEPS = [
+  '在首页点右上角 +，用一句话说你想做的工具，可以附图片或文本。',
+  '等它写完并自检通过，工具会出现在「我的应用」。',
+  '打开就能用；想改就回到工具里接着说想改什么。',
+  '第一次用到本机能力时会问你，之后可在应用详情里撤回。',
+]
 
 export function SettingsPage() {
   usePageTitle('设置')
@@ -44,11 +53,18 @@ export function SettingsPage() {
 
   return (
     <div className="page">
-      <header className="pb-4">
-        <p className="text-body text-muted-foreground">
-          模型、用量、备份与本地数据都在这里。
-        </p>
-      </header>
+      <section className="relative mb-3 overflow-hidden rounded-xl border border-border bg-surface p-4">
+        <DotField className="absolute -right-2 -top-2 text-primary" rows={4} cols={5} />
+        <div className="relative flex items-center gap-3">
+          <DotTile size="md" />
+          <div className="min-w-0">
+            <p className="text-title font-semibold">{APP_NAME}</p>
+            <p className="mt-0.5 text-caption text-muted-foreground">
+              版本 {APP_VERSION} · 数据只在这台设备上
+            </p>
+          </div>
+        </div>
+      </section>
 
       <div className="overflow-hidden rounded-lg border border-border bg-surface">
         <ul>
@@ -85,20 +101,29 @@ export function SettingsPage() {
         </ul>
       </div>
 
-      <section className="mt-4 rounded-lg border border-border bg-surface p-3">
+      <section className="mt-4 rounded-lg border border-border bg-surface p-4">
         <div className="flex items-center gap-2">
-          <BookOpen className="size-4 text-muted-foreground" aria-hidden />
+          <BookOpen className="size-4 text-primary" aria-hidden />
           <p className="text-body font-medium">怎么用</p>
         </div>
-        <ol className="mt-2 space-y-1.5 text-caption text-muted-foreground">
-          <li>1. 在首页点右上角 +，用一句话说你想做的工具，可以附图片或文本。</li>
-          <li>2. 等它写完并自检通过，工具会出现在「我的应用」。</li>
-          <li>3. 打开就能用；想改就回到工具里接着说想改什么。</li>
-          <li>4. 第一次用到本机能力时会问你，之后可在应用详情里撤回。</li>
+        <ol className="mt-3 space-y-2.5">
+          {GUIDE_STEPS.map((step, index) => (
+            <li key={step} className="flex gap-2.5">
+              <span
+                className={cn(
+                  'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-caption font-medium',
+                  index === 0
+                    ? 'bg-spark text-spark-foreground'
+                    : 'bg-muted text-muted-foreground',
+                )}
+              >
+                {index + 1}
+              </span>
+              <span className="text-caption text-muted-foreground">{step}</span>
+            </li>
+          ))}
         </ol>
-        <p className="mt-2 text-caption text-muted-foreground">
-          能力范围与限制写在「关于」里。
-        </p>
+        <p className="mt-3 text-caption text-muted-foreground">能力范围与限制写在「关于」里。</p>
       </section>
     </div>
   )
