@@ -108,6 +108,14 @@ export interface RequirementAttachment {
 }
 
 /** 需求摘要（由生成器从用户原话里自行判断，不再逐项追问） */
+/** 计划阶段向用户提出的关键疑问 */
+export interface ClarifyQuestion {
+  id: string
+  question: string
+  /** 建议选项（点选即可，也可自填） */
+  options: string[]
+}
+
 export interface AppRequirements {
   /** 用户原话 */
   brief: string
@@ -123,6 +131,8 @@ export interface AppRequirements {
   environment: 'offline' | 'online'
   /** 数据结构草案（白话） */
   data_draft: string
+  /** 生成前用户对关键疑问的确认（问题 → 答案），后续修改也会带上 */
+  clarifications?: Array<{ question: string; answer: string }>
   /** 用户附带的图片 / 文本材料 */
   attachments?: RequirementAttachment[]
 }
@@ -260,7 +270,17 @@ export interface Snapshot {
 }
 
 /** 生成任务状态 */
-export type JobPhase = 'preparing' | 'generating' | 'checking' | 'repairing' | 'saving' | 'done' | 'failed' | 'cancelled'
+export type JobPhase =
+  | 'preparing'
+  | 'planning'
+  | 'asking'
+  | 'generating'
+  | 'checking'
+  | 'repairing'
+  | 'saving'
+  | 'done'
+  | 'failed'
+  | 'cancelled'
 
 /** 生成过程的一条可见记录（思考 / 动作 / 检查结果） */
 export interface JobTrace {
@@ -305,6 +325,8 @@ export interface GenerationJob {
   thinking?: string
   /** 当前是否在流式输出 */
   streaming?: boolean
+  /** 计划阶段产生的关键疑问；phase 为 asking 时等待用户回答 */
+  questions?: ClarifyQuestion[]
 }
 
 /* ------------------------------------------------------------------ *

@@ -24,6 +24,7 @@ import type {
   AppPlan,
   AppRequirements,
   AppStyle,
+  ClarifyQuestion,
   DeviceAbilityGroup,
   GenerationJob,
   JobStep,
@@ -664,7 +665,8 @@ function startHeartbeat(appId: string): () => void {
   const timer = setInterval(() => {
     const job = jobs.get(appId)
     if (!job) return
-    if (!['preparing', 'generating', 'checking', 'repairing'].includes(job.phase)) return
+    if (!['preparing', 'planning', 'asking', 'generating', 'checking', 'repairing'].includes(job.phase))
+      return
     const message =
       job.phase === 'checking' || job.phase === 'repairing'
         ? job.message
@@ -757,11 +759,128 @@ export function subscribeJob(appId: string, listener: (job: GenerationJob) => vo
   }
 }
 
+/** 等待用户回答关键疑问的 Promise；取消生成时要把它一起唤醒 */
+const askWaiters = new Map<string, { resolve: (answers: Record<string, string>) => void; reject: (error: Error) => void }>()
+
+/** 用户在确认卡上提交答案后继续生成 */
+export function answerJobQuestions(appId: string, answers: Record<string, string>): void {
+  const waiter = askWaiters.get(appId)
+  if (!waiter) return
+  askWaiters.delete(appId)
+  waiter.resolve(answers)
+}
+
+/* ------------------------------------------------------------------ *
+ * 开发计划：先让模型拆步骤、提出关键疑问，再按步骤执行
+ * ------------------------------------------------------------------ */
+
+export interface PlanPayload {
+  steps: Array<{ title: string; detail?: string }>
+  questions: ClarifyQuestion[]
+}
+
+/** 容错解析计划 JSON：模型偶尔会在前后夹解释文字 */
+export function parsePlanPayload(text: string): PlanPayload {
+  let raw: unknown
+  try {
+    raw = tryParseJson(text)
+  } catch {
+    const start = text.indexOf('{')
+    const end = text.lastIndexOf('}')
+    if (start < 0 || end <= start) throw new Error('计划格式无法解析')
+    raw = JSON.parse(text.slice(start, end + 1).replace(/,\s*([}\]])/g, '$1'))
+  }
+  const record = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {}
+  const steps = Array.isArray(record.steps)
+    ? record.steps
+        .map((item) => (item && typeof item === 'object' ? (item as Record<string, unknown>) : {}))
+        .map((item) => ({
+          title: String(item.title ?? '').trim().slice(0, 24),
+          detail: item.detail ? String(item.detail).trim().slice(0, 80) : undefined,
+        }))
+        .filter((item) => item.title.length > 0)
+        .slice(0, 4)
+    : []
+  const questions = Array.isArray(record.questions)
+    ? record.questions
+        .map((item, index) => {
+          const q = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>
+          const options = Array.isArray(q.options)
+            ? q.options.map(String).filter(Boolean).slice(0, 4)
+            : []
+          return {
+            id: `q${index + 1}`,
+            question: String(q.question ?? '').trim().slice(0, 120),
+            options,
+          }
+        })
+        .filter((item) => item.question.length > 0)
+        .slice(0, 3)
+    : []
+  if (steps.length === 0) throw new Error('计划里没有步骤')
+  return { steps, questions }
+}
+
+function buildPlanMessages(app: PortalApp): ChatMessage[] {
+  const text = `用户想做一个单文件网页小工具，请先制定开发计划。只输出一个 JSON 对象，不要解释、不要代码围栏：
+
+{
+  "steps": [
+    { "title": "步骤名（6 字以内）", "detail": "这一步做什么（20 字以内）" }
+  ],
+  "questions": [
+    { "question": "只有用户能定的关键问题（30 字以内）", "options": ["选项A", "选项B"] }
+  ]
+}
+
+规则：
+- steps 给 3 到 4 步，从界面搭建到最后打磨，最后一步自然是你写出完整应用；步骤要具体到这个需求，不要写「开始」「完成」这类空话。
+- questions 只提「答案会明显改变做法、且你无法合理默认」的关键疑问（比如保存多久、以什么为单位统计）；最多 3 个，能自己定的就别问；每题给 2 到 4 个选项。没有就给空数组。
+
+【用户原话】
+${app.requirements.brief}
+
+【生成器的判断】
+- 核心功能：${app.requirements.core}
+- 数据：${app.requirements.data_draft}
+- 形态：单文件网页；${app.plan.data === 'kv' ? '用 portal.storage 保存' : '不持久化'}
+${app.requirements.clarifications?.length ? `
+【用户之前已确认过的问题】
+${app.requirements.clarifications.map((item) => `- ${item.question}：${item.answer}`).join('\n')}
+这些不要再问。` : ''}`
+  return [{ role: 'user', content: text }]
+}
+
+/** 单步推演：对计划中的某一步做一次轻量思考，结论作为这一步的可见记录 */
+function buildStepMessages(
+  app: PortalApp,
+  plan: PlanPayload,
+  answers: Record<string, string>,
+  stepIndex: number,
+): ChatMessage[] {
+  const step = plan.steps[stepIndex]
+  const text = `你在按计划开发一个网页小工具，现在执行其中一步。先思考，再给出这一步的结论。
+
+【用户原话】${app.requirements.brief}
+【开发计划】
+${plan.steps.map((item, index) => `${index + 1}. ${item.title}${item.detail ? `：${item.detail}` : ''}`).join('\n')}
+${Object.keys(answers).length ? `【用户已确认】
+${Object.entries(answers).map(([id, answer]) => `- ${id}：${answer}`).join('\n')}` : ''}
+
+现在执行第 ${stepIndex + 1} 步「${step.title}」。输出 80 字以内的中文结论，说明这一步你打算怎么做、定了哪些关键点；不要输出代码，不要 JSON。`
+  return [{ role: 'user', content: text }]
+}
+
 export function cancelJob(appId: string): void {
   const job = jobs.get(appId)
   if (!job) return
   // 先中断在途请求，再改状态：避免用户取消后请求跑完、继续计费
   abortControllers.get(appId)?.abort()
+  const waiter = askWaiters.get(appId)
+  if (waiter) {
+    askWaiters.delete(appId)
+    waiter.reject(new CancelledError())
+  }
   patchJob(appId, { cancelled: true, phase: 'cancelled', message: '已取消' })
 }
 
@@ -1001,46 +1120,114 @@ export async function startGeneration(appId: string): Promise<void> {
     const settings = await readLlmSettings()
     const messages = buildGenerateMessages(app)
 
+    pushTrace(appId, 'think', `先理解一下：${app.requirements.brief}`)
+
+    // 第一步：让模型制定开发计划（先规划再动手，步骤会显示给用户）
     setSteps(appId, [
       { id: 'understand', title: '理解需求' },
-      { id: 'plan', title: '确定方案', detail: '数据怎么存、要不要联网、界面结构' },
-      { id: 'write', title: '写代码', detail: '模型输出完整的单文件应用' },
+      { id: 'plan', title: '制定开发计划', detail: '拆解步骤，检查有没有要问你的' },
+    ])
+    completeStep(appId, 'understand')
+    activateStep(appId, 'plan')
+    patchJob(appId, { phase: 'planning', progress: 10, message: '正在制定开发计划' })
+
+    let plan: PlanPayload | null = null
+    try {
+      const planResult = await runStreamingChat(appId, buildPlanMessages(app), settings)
+      await recordUsage(app, 'summarize', planResult.model, planResult.inputTokens, planResult.outputTokens)
+      ensureNotCancelled(appId)
+      plan = parsePlanPayload(planResult.content)
+    } catch (cause) {
+      if (cause instanceof CancelledError) throw cause
+      // 计划解析失败不阻塞：退回「一步写出」的旧流程
+      pushTrace(appId, 'warn', `开发计划没生成成功（${(cause as Error).message}），按默认流程继续`)
+    }
+    ensureNotCancelled(appId)
+
+    // 第二步：有关键疑问先问用户，答案会记进需求、传给后续生成
+    let answers: Record<string, string> = {}
+    if (plan && plan.questions.length > 0) {
+      patchJob(appId, {
+        phase: 'asking',
+        progress: 16,
+        message: '有几个关键点需要你确认',
+        questions: plan.questions,
+      })
+      answers = await new Promise<Record<string, string>>((resolve, reject) => {
+        askWaiters.set(appId, { resolve, reject })
+      })
+      ensureNotCancelled(appId)
+      patchJob(appId, { phase: 'generating', questions: undefined, message: '已确认，继续生成' })
+      const clarifications = plan.questions.map((question) => ({
+        question: question.question,
+        answer: answers[question.id] ?? '（按默认）',
+      }))
+      pushTrace(
+        appId,
+        'ok',
+        `你确认了：${clarifications.map((item) => `${item.question} → ${item.answer}`).join('；')}`,
+      )
+      // 记进需求：之后继续修改时模型仍知道这些决定
+      const latestWithAnswers = (await getApp(appId)) ?? app
+      await saveApp({
+        ...latestWithAnswers,
+        requirements: {
+          ...latestWithAnswers.requirements,
+          clarifications: [
+            ...(latestWithAnswers.requirements.clarifications ?? []),
+            ...clarifications,
+          ],
+        },
+      })
+      const refreshed = await getApp(appId)
+      if (refreshed) Object.assign(app, refreshed)
+    }
+
+    // 第三步：按计划分步执行；每步一次轻量思考，最后一步写出完整应用
+    const planSteps = plan?.steps ?? [{ title: '写出应用', detail: '模型输出完整的单文件应用' }]
+    setSteps(appId, [
+      { id: 'understand', title: '理解需求' },
+      { id: 'plan', title: '制定开发计划', detail: planSteps.map((item) => item.title).join(' → ') },
+      ...planSteps.map((step, index) => ({
+        id: `s${index}`,
+        title: step.title,
+        detail: step.detail,
+      })),
       { id: 'check', title: '检查与修复', detail: '静态检查 + 离屏运行' },
       { id: 'save', title: '保存应用' },
     ])
-    pushTrace(appId, 'think', `先理解一下：${app.requirements.brief}`)
-    activateStep(appId, 'plan')
-    pushTrace(
-      appId,
-      'think',
-      app.plan.data === 'kv'
-        ? '判断：内容要留下来，用应用自己的本地存储，数据只在这台设备上'
-        : '判断：一次性使用，不保存历史',
-    )
-    pushTrace(
-      appId,
-      'think',
-      `能力：${app.plan.capabilities.llm ? '需要 AI' : '不用 AI'} · ${
-        app.plan.capabilities.network.length > 0
-          ? `联网访问 ${app.plan.capabilities.network.join('、')}`
-          : '不联网'
-      }`,
-    )
-    pushTrace(
-      appId,
-      'think',
-      `界面结构：${app.plan.style === 'form' ? '表单型' : app.plan.style === 'board' ? '卡片板' : '清单型'}`,
-    )
-    pushTrace(appId, 'act', '把需求整理成生成指令，交给模型')
-    activateStep(appId, 'write')
+    completeStep(appId, 'understand')
+    completeStep(appId, 'plan')
+    activateStep(appId, 's0')
 
-    patchJob(appId, { phase: 'generating', progress: 24, message: '正在写出应用' })
+    for (let index = 0; index < planSteps.length - 1; index += 1) {
+      ensureNotCancelled(appId)
+      try {
+        const stepResult = await runStreamingChat(
+          appId,
+          buildStepMessages(app, plan ?? { steps: planSteps, questions: [] }, answers, index),
+          settings,
+        )
+        await recordUsage(app, 'summarize', stepResult.model, stepResult.inputTokens, stepResult.outputTokens)
+        pushTrace(appId, 'think', stepResult.content.trim().slice(0, 120))
+      } catch (cause) {
+        if (cause instanceof CancelledError) throw cause
+        // 单步推演失败不阻塞：记录后继续
+        pushTrace(appId, 'warn', `「${planSteps[index].title}」推演失败，跳过`)
+      }
+      completeStep(appId, `s${index}`)
+      activateStep(appId, `s${index + 1}`)
+    }
+
+    const lastStepId = `s${planSteps.length - 1}`
+    patchJob(appId, { phase: 'generating', progress: 34, message: `正在${planSteps[planSteps.length - 1].title}` })
     ensureNotCancelled(appId)
 
     pushTrace(appId, 'act', '模型正在写代码')
     const result = await runStreamingChat(appId, messages, settings)
     await recordUsage(app, 'generate', result.model, result.inputTokens, result.outputTokens)
     ensureNotCancelled(appId)
+    completeStep(appId, lastStepId)
 
     const parsed = parseGeneratedPayload(result.content)
     pushTrace(
@@ -1050,6 +1237,7 @@ export async function startGeneration(appId: string): Promise<void> {
     )
     for (const note of parsed.notes) pushTrace(appId, 'think', note)
 
+    activateStep(appId, 'check')
     patchJob(appId, { phase: 'checking', progress: 52, message: '正在检查应用' })
     const checked = await checkAndRepair(app, parsed, settings)
     ensureNotCancelled(appId)

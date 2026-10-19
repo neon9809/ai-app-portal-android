@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowUpRight,
   Check,
+  CircleHelp,
   ChevronDown,
   CircleSlash,
   Paperclip,
@@ -20,6 +21,7 @@ import { getApp, listApps, saveApp } from '@/shared/portal/db'
 import { takeSnapshot } from '@/shared/portal/backup'
 import { pickFile } from '@/shared/portal/file-picker'
 import {
+  answerJobQuestions,
   cancelJob,
   deleteRevision,
   getJob,
@@ -32,6 +34,7 @@ import {
 } from '@/shared/portal/generator'
 import { isLlmConfigured, readLlmSettings } from '@/shared/portal/llm'
 import type {
+  ClarifyQuestion,
   GenerationJob,
   JobStep,
   PortalApp,
@@ -46,6 +49,8 @@ import { useToast } from '@/shared/ui/Toast'
 
 const RUNNING_PHASES: GenerationJob['phase'][] = [
   'preparing',
+  'planning',
+  'asking',
   'generating',
   'checking',
   'repairing',
@@ -559,11 +564,20 @@ export function StudioPage() {
               />
             )}
 
+            {generating && job?.phase === 'asking' && job.questions && (
+              <AskCard
+                questions={job.questions}
+                onSubmit={(answers) => answerJobQuestions(app!.id, answers)}
+              />
+            )}
+
             {generating && (
               <p className="text-center text-caption text-muted-foreground">
-                {job && ['checking', 'repairing', 'saving'].includes(job.phase)
-                  ? '代码写完了，正在做最后的检查与保存。'
-                  : !job?.live && !job?.thinking
+                {job?.phase === 'asking'
+                  ? '在等你确认上面这几个关键点。'
+                  : job && ['checking', 'repairing', 'saving'].includes(job.phase)
+                    ? '代码写完了，正在做最后的检查与保存。'
+                    : !job?.live && !job?.thinking
                     ? `模型还没开始输出，已等待 ${elapsed} 秒…`
                     : '生成时请保持门户在前台。'}
               </p>
@@ -867,6 +881,74 @@ function AssistantTurn({
   )
 }
 
+/** 关键疑问确认卡：计划阶段模型提出的问题，点选项或自填 */
+function AskCard({
+  questions,
+  onSubmit,
+}: {
+  questions: ClarifyQuestion[]
+  onSubmit: (answers: Record<string, string>) => void
+}) {
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const answeredAll = questions.every((question) => (answers[question.id] ?? '').trim().length > 0)
+
+  return (
+    <section className="onboarding-rise rounded-xl border border-spark/40 bg-spark-soft/60 p-4">
+      <header className="flex items-center gap-2">
+        <CircleHelp className="size-4 text-spark" aria-hidden />
+        <p className="text-body font-medium">有几个关键点需要你定</p>
+      </header>
+      <p className="mt-0.5 text-caption text-muted-foreground">
+        都能自己猜的就直接做了，这几个答案会明显改变做法。
+      </p>
+
+      <ol className="mt-3 space-y-3">
+        {questions.map((question) => (
+          <li key={question.id}>
+            <p className="text-body">{question.question}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {question.options.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setAnswers((current) => ({ ...current, [question.id]: option }))}
+                  className={cn(
+                    'min-h-tap rounded-full border px-3.5 text-caption transition-colors duration-fast ease-standard',
+                    answers[question.id] === option
+                      ? 'border-spark bg-spark text-spark-foreground'
+                      : 'border-border bg-surface text-foreground active:bg-accent',
+                  )}
+                >
+                  {option}
+                </button>
+              ))}
+              <input
+                value={answers[question.id] ?? ''}
+                onChange={(event) =>
+                  setAnswers((current) => ({ ...current, [question.id]: event.target.value }))
+                }
+                placeholder="或自己写"
+                maxLength={60}
+                className="min-h-tap min-w-[7rem] flex-1 rounded-full border border-input bg-surface px-3.5 text-caption outline-none focus:border-primary"
+              />
+            </div>
+          </li>
+        ))}
+      </ol>
+
+      <Button
+        block
+        variant="spark"
+        className="mt-4"
+        disabled={!answeredAll}
+        onClick={() => onSubmit(answers)}
+      >
+        继续
+      </Button>
+    </section>
+  )
+}
+
 function ChatBubble({
   role,
   text,
@@ -1047,7 +1129,7 @@ function StepList({
                     </p>
                   </div>
                 ))}
-                {step.id === 'write' && thinking && (
+                {step.status === 'active' && thinking && (
                   <div className="mt-2 overflow-hidden rounded-lg bg-foreground">
                     <div className="flex items-center gap-2 border-b border-background/10 px-2.5 py-1.5">
                       <span
@@ -1064,7 +1146,7 @@ function StepList({
                     </pre>
                   </div>
                 )}
-                {step.id === 'write' && live && (
+                {step.status === 'active' && live && (
                   <div className="mt-2 overflow-hidden rounded-lg bg-foreground">
                     <div className="flex items-center gap-2 border-b border-background/10 px-2.5 py-1.5">
                       <span
