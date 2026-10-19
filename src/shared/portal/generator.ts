@@ -11,6 +11,7 @@ import { addAudit, addUsage, getApp, saveApp } from './db'
 import {
   chat,
   chatStream,
+  estimateTokens,
   LlmError,
   readLlmSettings,
   type ChatContentPart,
@@ -19,6 +20,13 @@ import {
 } from './llm'
 import { runSandboxProbe, type RuntimeIssue } from './sandbox'
 import { resolveLocale, translate } from '@/shared/i18n'
+import {
+  aggregateTools,
+  executeEntry,
+  findEntry,
+  readMcpConfig,
+  readMcpServers,
+} from './mcp'
 
 /** 生成器里的用户可见文案（任务标题 / 步骤名 / 时间线）跟随当前语言 */
 const tr = (key: string, params?: Record<string, string | number>) =>
@@ -288,6 +296,10 @@ ${deviceGroupPrompt()}
 11. 剪贴板、文件、蓝牙、录音、相机、定位、通知、触发器以及 capabilities.device 里的端侧能力组都是敏感能力，只有需求里确实要用到时才声明，否则一律不要出现。
 12. 打开其它应用、修改系统设置、上传文件、打开快记录音这些操作会影响手机本身；只能在用户明确要求时调用，不要自作主张。
 
+工具（function calling）：本次请求的 tools 参数里列出了可用的本机与 MCP 工具。
+需要真实、实时或你不确定的数据（当前时间、天气、外部信息）时必须先调用对应工具拿结果，不要编造；
+与需求无关就不要调用。工具调用会自动执行并把结果回传给你。
+
 当前技术形态：${STYLE_GUIDE.list}
 ${STYLE_GUIDE.form}
 ${STYLE_GUIDE.board}
@@ -368,18 +380,38 @@ function buildReviseMessages(
   app: PortalApp,
   request: string,
   attachments: RequirementAttachment[] = [],
+  contextTokens = 0,
 ): ChatMessage[] {
-  const text = `这是用户已经验收中的工具，现在要按反馈修改。请输出修改后的完整 JSON（html 必须是完整文档，其余字段可随改动更新）。
+  // 默认带全部修改记录；设置了最大输入 tokens 时，超出就从最早的记录开始省略
+  let history = [...app.revisions]
+  let omitted = 0
+  const brief = `这是用户已经验收中的工具，现在要按反馈修改。请输出修改后的完整 JSON（html 必须是完整文档，其余字段可随改动更新）。`
+  const assemble = (records: typeof history, dropped: number) => {
+    const historyText =
+      records.length > 0
+        ? `\n【修改记录】\n${records
+            .map((revision, index) => `${index + 1}. 用户：「${revision.request}」→ 结果：${revision.summary}`)
+            .join('\n')}${dropped > 0 ? `\n（更早的 ${dropped} 轮记录因上下文长度省略）` : ''}\n`
+        : ''
+    return `${brief}
 
 【工具名】${app.name}
 【原始需求】${app.requirements.brief}
-【当前方案】${app.plan.reasoning}
+【当前方案】${app.plan.reasoning}${historyText}
 【用户的修改意见】${request}
 
 【当前完整 HTML】
 ${app.html}
 
 只输出 JSON。`
+  }
+  if (contextTokens > 0) {
+    while (history.length > 0 && estimateTokens(assemble(history, omitted)) > contextTokens) {
+      history = history.slice(1)
+      omitted += 1
+    }
+  }
+  const text = assemble(history, omitted)
 
   const parts: ChatContentPart[] = [{ type: 'text', text }]
   for (const attachment of attachments) {
@@ -963,6 +995,66 @@ async function runStreamingChat(
   appId: string,
   messages: ChatMessage[],
   settings: LlmSettings,
+  options?: { tools?: boolean },
+): Promise<Awaited<ReturnType<typeof chat>>> {
+  // MCP 工具（内置 + 外部服务器）：模型在生成过程中可调用，结果回传后继续生成。
+  // 只下发「设置 → MCP」里启用的工具；连不上的外部服务器跳过并记录
+  const mcpConfig = await readMcpConfig()
+  const mcpServers = await readMcpServers()
+  const aggregated = await aggregateTools(mcpConfig, mcpServers)
+  const tools =
+    options?.tools && settings.apiStyle === 'responses'
+      ? aggregated.responsesStyle
+      : options?.tools
+        ? aggregated.chatStyle
+        : undefined
+  if (options?.tools && aggregated.unreachable.length > 0) {
+    pushTrace(appId, 'warn', tr('mcp.serverSkipped', { names: aggregated.unreachable.join('、') }))
+  }
+  let currentMessages = messages
+  // 最多 4 轮工具调用，防止模型反复要工具不给结果
+  for (let round = 0; round < 4; round += 1) {
+    const result = await runStreamingChatOnce(appId, currentMessages, settings, tools)
+    if (!result.toolCalls || result.toolCalls.length === 0) return result
+    const toolResults: ChatMessage[] = []
+    for (const call of result.toolCalls) {
+      const entry = findEntry(aggregated, call.name)
+      if (!entry) {
+        pushTrace(appId, 'warn', tr('mcp.toolFail', { name: call.name, message: 'unknown tool' }))
+        toolResults.push({
+          role: 'tool',
+          content: `工具 ${call.name} 不存在。可用工具：${aggregated.entries.map((item) => item.key).join('、') || '（无）'}`,
+          toolCallId: call.id,
+        })
+        continue
+      }
+      pushTrace(appId, 'act', tr('mcp.toolTrace', { name: call.name, args: (call.arguments || '{}').slice(0, 120) }))
+      let output: string
+      try {
+        const args = JSON.parse(call.arguments || '{}') as Record<string, unknown>
+        output = await executeEntry(entry, args)
+      } catch (error) {
+        output = `工具执行失败：${(error as Error).message}`
+      }
+      pushTrace(appId, 'ok', tr('mcp.toolDone', { result: output.slice(0, 160) }))
+      toolResults.push({ role: 'tool', content: output, toolCallId: call.id })
+    }
+    currentMessages = [
+      ...currentMessages,
+      { role: 'assistant', content: '', toolCalls: result.toolCalls },
+      ...toolResults,
+    ]
+  }
+  // 超出轮数还想要工具：按普通请求再发一次（不带 tools），拿最终结果
+  return runStreamingChatOnce(appId, currentMessages, settings, undefined)
+}
+
+/** 单次流式请求（含非流式回退），不带工具循环 */
+async function runStreamingChatOnce(
+  appId: string,
+  messages: ChatMessage[],
+  settings: LlmSettings,
+  tools?: unknown[],
 ): Promise<Awaited<ReturnType<typeof chat>>> {
   let live = ''
   let thinking = ''
@@ -987,6 +1079,7 @@ async function runStreamingChat(
         settings,
         model: settings.model,
         signal: controller.signal,
+        ...(tools && tools.length > 0 ? { tools } : {}),
         // 推理模型的思考过程：让用户看到模型在做什么，而不是干等
         onReasoning: (delta) => {
           received = true
@@ -1020,7 +1113,12 @@ async function runStreamingChat(
       'warn',
       tr('gen.streamFallbackTrace'),
     )
-    return chat(messages, { settings, model: settings.model, signal: controller.signal })
+    return chat(messages, {
+      settings,
+      model: settings.model,
+      signal: controller.signal,
+      ...(tools && tools.length > 0 ? { tools } : {}),
+    })
   } finally {
     if (abortControllers.get(appId) === controller) abortControllers.delete(appId)
   }
@@ -1241,7 +1339,7 @@ export async function startGeneration(appId: string): Promise<void> {
     ensureNotCancelled(appId)
 
     pushTrace(appId, 'act', tr('gen.writingCode'))
-    const result = await runStreamingChat(appId, messages, settings)
+    const result = await runStreamingChat(appId, messages, settings, { tools: true })
     await recordUsage(app, 'generate', result.model, result.inputTokens, result.outputTokens)
     ensureNotCancelled(appId)
     completeStep(appId, lastStepId)
@@ -1352,8 +1450,9 @@ export async function reviseApp(
     pushTrace(appId, 'act', tr('gen.editingCode'))
     const result = await runStreamingChat(
       appId,
-      buildReviseMessages(app, request.trim(), attachments),
+      buildReviseMessages(app, request.trim(), attachments, settings.contextTokens),
       settings,
+      { tools: true },
     )
     await recordUsage(app, 'generate', result.model, result.inputTokens, result.outputTokens)
     ensureNotCancelled(appId)

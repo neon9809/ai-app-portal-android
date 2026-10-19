@@ -199,8 +199,8 @@ export function AppSettingsPage() {
                   >
                     <span
                       className={cn(
-                        'absolute top-0.5 size-5 rounded-full bg-surface transition-transform',
-                        trigger.enabled ? 'translate-x-[22px]' : 'translate-x-0.5',
+                        'absolute left-0.5 top-1/2 size-5 -translate-y-1/2 rounded-full bg-surface transition-transform',
+                        trigger.enabled ? 'translate-x-[20px]' : 'translate-x-0',
                       )}
                     />
                   </span>
@@ -267,8 +267,8 @@ function SettingRow({
         >
           <span
             className={cn(
-              'absolute top-0.5 size-5 rounded-full bg-surface transition-transform',
-              checked ? 'translate-x-[22px]' : 'translate-x-0.5',
+              'absolute left-0.5 top-1/2 size-5 -translate-y-1/2 rounded-full bg-surface transition-transform',
+              checked ? 'translate-x-[20px]' : 'translate-x-0',
             )}
           />
         </span>

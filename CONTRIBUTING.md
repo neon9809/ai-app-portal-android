@@ -26,10 +26,12 @@ npm run build       # 壳侧产物构建
 
 ## 代码约定
 
-- 颜色、圆角、间距只用 `src/shared/styles/tokens.css` 里的语义 token，不写死色值。
+- 颜色、圆角、间距只用 `src/shared/styles/tokens.css` 里的语义 token，不写死色值；不写 `dark:` 变体，深色由 token 自动切换（品牌蓝固定处用 `brand` 系）。
+- 界面文案一律走 i18n：在 `src/shared/i18n/zh-CN.ts` 与 `en-US.ts` 同步添加键，组件里不写死中英文；生成器的用户可见步骤名 / 状态文案同样走字典。
 - 新的原生能力调用统一走 `src/shared/bridge`，不要直接访问 `window.capsule`。
 - 生成应用只能通过 `window.portal` 访问能力；端侧原子能力只经 `window.portal.device.call`。
 - 新增能力必须同时更新：能力声明类型、授权文案、生成器提示词、静态检查、`PRODUCT.md` 与 `NOTICE`（如涉及新的第三方组件）。
+- 新增内置 MCP 工具必须同步 `src/shared/portal/mcp.ts` 的注册表（名称 / 描述 / JSON Schema / 执行函数）与 `PRODUCT.md`；外部 MCP 服务器协议遵循 Streamable HTTP。
 - 不要提交密钥、`.env.local`、签名证书（`capsule/signing/*.p12`、`capsule.properties`）或平台内部元数据。
 
 ## 提交信息

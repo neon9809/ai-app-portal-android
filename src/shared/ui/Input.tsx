@@ -101,10 +101,12 @@ export function Switch({
           checked ? 'bg-primary' : 'bg-muted',
         )}
       >
+        {/* 显式 left 定位：绝对定位的拨扭只设 top 时水平方向落在静态位置，
+            而 button 默认 text-align:center 会把它先推到中间，再叠加位移就滑出轨道 */}
         <span
           className={cn(
-            'absolute top-0.5 size-6 rounded-full bg-surface shadow-sm transition-transform duration-base',
-            checked ? 'translate-x-[22px]' : 'translate-x-0.5',
+            'absolute left-[2px] top-1/2 size-6 -translate-y-1/2 rounded-full bg-surface shadow-sm transition-transform duration-base',
+            checked ? 'translate-x-[20px]' : 'translate-x-0',
           )}
         />
       </button>

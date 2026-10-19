@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ChevronRight,
   Cpu,
+  Plug,
   Gauge,
   Info,
   Languages,
@@ -21,6 +22,7 @@ import { APP_NAME, APP_VERSION } from '@/shared/config/app'
 import { cn } from '@/shared/lib/cn'
 import { listApps, listAudit, listUsage, settingGet } from '@/shared/portal/db'
 import { isLlmConfigured, readLlmSettings } from '@/shared/portal/llm'
+import { BUILTIN_TOOLS, readMcpConfig } from '@/shared/portal/mcp'
 import { formatRelativeTime } from '@/shared/portal/utils'
 import { getThemePreference, setThemePreference, type ThemePreference } from '@/shared/theme'
 import {
@@ -47,6 +49,8 @@ export function SettingsPage() {
   const [lastBackup, setLastBackup] = useState<number | null>(null)
   const [theme, setTheme] = useState<ThemePreference>(() => getThemePreference())
   const [localePref, setLocalePref] = useState<LocalePreference>(() => getLocalePreference())
+  const [mcpEnabled, setMcpEnabled] = useState(0)
+  const mcpTotal = BUILTIN_TOOLS.length
 
   useEffect(() => {
     setModel(t('settings.modelUnset'))
@@ -63,6 +67,8 @@ export function SettingsPage() {
       setAppCount(apps.filter((app) => app.status === 'installed' || Boolean(app.html)).length)
       setAuditCount(audit.length)
       setLastBackup(typeof backup === 'number' ? backup : null)
+      const mcp = await readMcpConfig()
+      setMcpEnabled(BUILTIN_TOOLS.filter((tool) => !mcp.disabled.includes(tool.name)).length)
     })()
     // 跟随语言重跑：「未配置 / Not set up」这类状态文案要跟着切
   }, [t])
@@ -89,6 +95,12 @@ export function SettingsPage() {
             title={t('settings.model')}
             value={model}
             onClick={() => navigate('/settings/model')}
+          />
+          <SettingRow
+            icon={Plug}
+            title={t('mcp.title')}
+            value={t('mcp.settingsRow', { enabled: mcpEnabled, total: mcpTotal })}
+            onClick={() => navigate('/settings/mcp')}
           />
           <SettingRow
             icon={Gauge}

@@ -11,7 +11,9 @@ import {
   writeLlmSettings,
   type LlmSettings,
 } from '@/shared/portal/llm'
+import { cn } from '@/shared/lib/cn'
 import { Button } from '@/shared/ui/Button'
+import { Switch } from '@/shared/ui/Input'
 import { useToast } from '@/shared/ui/Toast'
 
 export function ModelSettingsPage() {
@@ -142,23 +144,77 @@ export function ModelSettingsPage() {
           className="mt-1 w-full rounded-md border border-input bg-surface px-3 py-2.5 text-body outline-none focus:border-primary"
         />
 
-        <p className="mt-3 text-caption font-medium">{t('model.temperature')}</p>
-        <div className="mt-1 flex gap-2">
-          {[0.3, 0.7, 1].map((value) => (
+        <p className="mt-3 block text-caption font-medium">{t('model.apiStyle')}</p>
+        <div className="mt-1 grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('model.apiStyle')}>
+          {(['chat', 'responses'] as const).map((style) => (
             <button
-              key={value}
+              key={style}
               type="button"
-              onClick={() => update('temperature', value)}
-              className={
-                settings.temperature === value
-                  ? 'min-h-tap flex-1 rounded-md border border-primary bg-primary-soft text-body font-medium text-primary'
-                  : 'min-h-tap flex-1 rounded-md border border-border bg-surface text-body text-muted-foreground'
-              }
+              role="radio"
+              aria-checked={(settings.apiStyle ?? 'chat') === style}
+              onClick={() => update('apiStyle', style)}
+              className={cn(
+                'min-h-tap rounded-md border text-caption transition-colors duration-fast',
+                (settings.apiStyle ?? 'chat') === style
+                  ? 'border-primary bg-primary-soft font-medium text-primary'
+                  : 'border-border bg-surface text-foreground active:bg-accent',
+              )}
             >
-              {value === 0.3 ? t('model.tempLow') : value === 0.7 ? t('model.tempMid') : t('model.tempHigh')}
+              {style === 'chat' ? t('model.styleChat') : t('model.styleResponses')}
             </button>
           ))}
         </div>
+        <p className="mt-1 text-caption text-muted-foreground">{t('model.styleHint')}</p>
+
+        <div className="mt-3 flex items-center gap-3 rounded-md border border-border bg-surface px-3 py-2.5">
+          <div className="min-w-0 flex-1">
+            <p className="text-body">{t('model.vision')}</p>
+            <p className="mt-0.5 text-caption text-muted-foreground">{t('model.visionHint')}</p>
+          </div>
+          <Switch checked={settings.vision} onChange={(checked) => update('vision', checked)} />
+        </div>
+
+        <label htmlFor="context-tokens" className="mt-3 block text-caption font-medium">
+          {t('model.contextTokens')}
+        </label>
+        <input
+          id="context-tokens"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={settings.contextTokens}
+          onChange={(event) =>
+            update('contextTokens', Math.max(0, Math.floor(Number(event.target.value) || 0)))
+          }
+          placeholder="0"
+          className="mt-1 w-full rounded-md border border-input bg-surface px-3 py-2.5 text-body outline-none focus:border-primary"
+        />
+        <p className="mt-1 text-caption text-muted-foreground">{t('model.contextTokensHint')}</p>
+
+        <label htmlFor="temperature" className="mt-3 block text-caption font-medium">
+          {t('model.temperature')}
+        </label>
+        <input
+          id="temperature"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={2}
+          step={0.1}
+          value={settings.temperature ?? ''}
+          onChange={(event) => {
+            const raw = event.target.value.trim()
+            if (raw === '') {
+              update('temperature', null)
+              return
+            }
+            const value = Number(raw)
+            if (Number.isFinite(value)) update('temperature', Math.min(2, Math.max(0, value)))
+          }}
+          placeholder={t('model.tempPlaceholder')}
+          className="mt-1 w-full rounded-md border border-input bg-surface px-3 py-2.5 text-body outline-none focus:border-primary"
+        />
+        <p className="mt-1 text-caption text-muted-foreground">{t('model.tempHint')}</p>
       </section>
 
       {testResult && (

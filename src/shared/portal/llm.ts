@@ -15,7 +15,14 @@ export interface LlmSettings {
   model: string
   /** 应用内 AI 调用使用的模型；留空则与生成模型一致 */
   appModel: string
-  temperature: number
+  /** 生成温度；null = 不传，用服务端默认 */
+  temperature: number | null
+  /** 接口风格：chat = OpenAI Chat Completions；responses = OpenAI Responses API */
+  apiStyle: 'chat' | 'responses'
+  /** 模型是否有视觉能力：开启后创作对话才能附图片 */
+  vision: boolean
+  /** 模型最大输入 tokens；超出时从最早的修改记录开始省略；0 = 不限制 */
+  contextTokens: number
 }
 
 export const EMPTY_LLM_SETTINGS: LlmSettings = {
@@ -23,7 +30,10 @@ export const EMPTY_LLM_SETTINGS: LlmSettings = {
   apiKey: '',
   model: '',
   appModel: '',
-  temperature: 0.7,
+  temperature: null,
+  apiStyle: 'chat',
+  vision: false,
+  contextTokens: 0,
 }
 
 export type ChatContentPart =
@@ -33,9 +43,21 @@ export type ChatContentPart =
 /** 字符串或 OpenAI 兼容的多段内容（文本 + 图片） */
 export type ChatContent = string | ChatContentPart[]
 
+/** 模型发起的一次工具调用（OpenAI 两种协议归一后的形状） */
+export interface ToolCall {
+  id: string
+  name: string
+  /** JSON 字符串参数 */
+  arguments: string
+}
+
 export interface ChatMessage {
-  role: 'system' | 'user' | 'assistant'
+  role: 'system' | 'user' | 'assistant' | 'tool'
   content: ChatContent
+  /** assistant 消息附带的工具调用请求 */
+  toolCalls?: ToolCall[]
+  /** tool 角色消息对应的调用 id */
+  toolCallId?: string
 }
 
 export interface ChatResult {
@@ -43,12 +65,16 @@ export interface ChatResult {
   inputTokens: number
   outputTokens: number
   model: string
+  /** 模型请求的工具调用（为空表示本次就是最终回答） */
+  toolCalls?: ToolCall[]
 }
 
 const SETTINGS_KEY = 'llm'
 
 export async function readLlmSettings(): Promise<LlmSettings> {
-  return (await settingGet<LlmSettings>(SETTINGS_KEY)) ?? { ...EMPTY_LLM_SETTINGS }
+  const stored = await settingGet<Partial<LlmSettings>>(SETTINGS_KEY)
+  // 旧配置没有新字段：与默认值合并，避免 undefined 破坏请求构造
+  return { ...EMPTY_LLM_SETTINGS, ...(stored ?? {}) }
 }
 
 export async function writeLlmSettings(settings: LlmSettings): Promise<void> {
@@ -63,10 +89,70 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, '')
 }
 
-function chatEndpoint(baseUrl: string): string {
-  const base = normalizeBaseUrl(baseUrl)
-  if (base.endsWith('/chat/completions')) return base
-  return `${base}/chat/completions`
+/** 按接口风格拼端点：chat → /chat/completions；responses → /responses */
+function apiEndpoint(baseUrl: string, style: LlmSettings['apiStyle']): string {
+  let base = normalizeBaseUrl(baseUrl)
+  if (base.endsWith('/chat/completions')) base = base.slice(0, -'/chat/completions'.length)
+  if (base.endsWith('/responses')) base = base.slice(0, -'/responses'.length)
+  return style === 'responses' ? `${base}/responses` : `${base}/chat/completions`
+}
+
+function buildResponsesPayload(
+  messages: ChatMessage[],
+  model: string,
+  temperature: number | null,
+  stream: boolean,
+  tools?: unknown[],
+): Record<string, unknown> {
+  const instructions = messages
+    .filter((message) => message.role === 'system')
+    .map((message) => (typeof message.content === 'string' ? message.content : message.content.map((part) => part.type === 'text' ? part.text : '').join('\n')))
+    .join('\n\n')
+  const input: Array<Record<string, unknown>> = messages
+    .filter((message) => message.role !== 'system')
+    .flatMap((message) => {
+      // assistant 的工具调用请求：function_call 输出项
+      if (message.toolCalls && message.toolCalls.length > 0) {
+        return message.toolCalls.map(
+          (call) =>
+            ({
+              type: 'function_call',
+              call_id: call.id,
+              name: call.name,
+              arguments: call.arguments,
+            }) as Record<string, unknown>,
+        )
+      }
+      // 工具执行结果：function_call_output 输入项
+      if (message.role === 'tool') {
+        return [
+          {
+            type: 'function_call_output',
+            call_id: message.toolCallId ?? '',
+            output: typeof message.content === 'string' ? message.content : '',
+          },
+        ]
+      }
+      return [
+        {
+          role: message.role,
+          content:
+            typeof message.content === 'string'
+              ? [{ type: 'input_text' as const, text: message.content }]
+              : message.content.map((part) =>
+                  part.type === 'image_url'
+                    ? { type: 'input_image' as const, image_url: part.image_url.url }
+                    : { type: 'input_text' as const, text: part.text },
+                ),
+        },
+      ]
+    })
+  const payload: Record<string, unknown> = { model, input }
+  if (typeof temperature === 'number') payload.temperature = temperature
+  if (instructions) payload.instructions = instructions
+  if (stream) payload.stream = true
+  if (tools && tools.length > 0) payload.tools = tools
+  return payload
 }
 
 /** 粗略 token 估算（接口没返回 usage 时兜底）：中文约 1 字 1 token，英文约 4 字符 1 token */
@@ -187,6 +273,8 @@ export async function chat(
     timeoutMs?: number
     /** 用户取消生成时中断请求（真机壳请求无法中断，浏览器路径可中断） */
     signal?: AbortSignal
+    /** 内置 MCP 工具定义（chatToolsParam()） */
+    tools?: unknown[]
   },
 ): Promise<ChatResult> {
   const settings = options?.settings ?? (await readLlmSettings())
@@ -196,7 +284,8 @@ export async function chat(
   const model = options?.model ?? settings.model
   if (!model.trim()) throw new LlmError('config', '还没有填写模型名')
 
-  const url = chatEndpoint(settings.baseUrl)
+  const style = settings.apiStyle ?? 'chat'
+  const url = apiEndpoint(settings.baseUrl, style)
   const timeoutMs = options?.timeoutMs ?? 240_000
 
   let response: { status: number; data: unknown }
@@ -204,11 +293,16 @@ export async function chat(
     response = await postJson(
       url,
       settings.apiKey.trim(),
-      {
-        model: model.trim(),
-        messages,
-        temperature: settings.temperature,
-      },
+      style === 'responses'
+        ? buildResponsesPayload(messages, model.trim(), settings.temperature, false, options?.tools)
+        : {
+            model: model.trim(),
+            messages,
+            ...(typeof settings.temperature === 'number'
+              ? { temperature: settings.temperature }
+              : {}),
+            ...(options?.tools && options.tools.length > 0 ? { tools: options.tools } : {}),
+          },
       timeoutMs,
       options?.signal,
     )
@@ -243,17 +337,69 @@ export async function chat(
     parsed = payload as RawChatResponse
   }
 
-  const content = parsed?.choices?.[0]?.message?.content ?? parsed?.choices?.[0]?.text
-  if (typeof content !== 'string' || !content.trim()) {
+  const responsesPayload = parsed as unknown as {
+    output_text?: string
+    output?: Array<{ content?: Array<{ type?: string; text?: string }> }>
+    usage?: { input_tokens?: number; output_tokens?: number }
+  }
+  const content =
+    parsed?.choices?.[0]?.message?.content ??
+    parsed?.choices?.[0]?.text ??
+    (typeof responsesPayload.output_text === 'string' && responsesPayload.output_text
+      ? responsesPayload.output_text
+      : (responsesPayload.output ?? [])
+          .flatMap((item) => item.content ?? [])
+          .filter((part) => part.type === 'output_text' && part.text)
+          .map((part) => part.text)
+          .join(''))
+  const toolCalls = extractToolCalls(parsed, style)
+  if ((typeof content !== 'string' || !content.trim()) && toolCalls.length === 0) {
     throw new LlmError('bad-response', '模型没有返回内容，请检查模型是否支持对话接口')
   }
 
   const inputTokens =
     parsed.usage?.prompt_tokens ??
+    responsesPayload.usage?.input_tokens ??
     messages.reduce((sum, message) => sum + estimateContentTokens(message.content), 0)
-  const outputTokens = parsed.usage?.completion_tokens ?? estimateTokens(content)
+  const outputTokens =
+    parsed.usage?.completion_tokens ??
+    responsesPayload.usage?.output_tokens ??
+    estimateTokens(content)
 
-  return { content, inputTokens, outputTokens, model: model.trim() }
+  return {
+    content: typeof content === 'string' ? content : '',
+    inputTokens,
+    outputTokens,
+    model: model.trim(),
+    ...(toolCalls.length > 0 ? { toolCalls } : {}),
+  }
+}
+
+/** 从两种协议的响应里归一提取工具调用请求 */
+function extractToolCalls(payload: unknown, style: 'chat' | 'responses'): ToolCall[] {
+  const randomId = () => `call_${Math.random().toString(36).slice(2)}`
+  if (style === 'chat') {
+    type ChatToolCall = { id?: string; function?: { name?: string; arguments?: string } }
+    type ChatPayload = { choices?: Array<{ message?: { tool_calls?: ChatToolCall[] } }> }
+    const calls = (payload as ChatPayload)?.choices?.[0]?.message?.tool_calls
+    return (calls ?? [])
+      .filter((call) => call.function?.name)
+      .map((call) => ({
+        id: call.id ?? randomId(),
+        name: String(call.function?.name),
+        arguments: call.function?.arguments ?? '{}',
+      }))
+  }
+  type ResponsesItem = { type?: string; call_id?: string; name?: string; arguments?: string }
+  type ResponsesPayload = { output?: ResponsesItem[] }
+  const output = (payload as ResponsesPayload)?.output ?? []
+  return output
+    .filter((item) => item.type === 'function_call' && item.name)
+    .map((item) => ({
+      id: item.call_id ?? randomId(),
+      name: String(item.name),
+      arguments: item.arguments ?? '{}',
+    }))
 }
 
 /**
@@ -273,6 +419,8 @@ export async function chatStream(
     onReasoning?: (delta: string) => void
     /** 用户取消生成时中断流式读取 */
     signal?: AbortSignal
+    /** 内置 MCP 工具定义（chatToolsParam() / responsesToolsParam()） */
+    tools?: unknown[]
   },
 ): Promise<ChatResult> {
   const settings = options?.settings ?? (await readLlmSettings())
@@ -282,7 +430,8 @@ export async function chatStream(
   const model = options?.model ?? settings.model
   if (!model.trim()) throw new LlmError('config', '还没有填写模型名')
 
-  const url = chatEndpoint(settings.baseUrl)
+  const style = settings.apiStyle ?? 'chat'
+  const url = apiEndpoint(settings.baseUrl, style)
   const timeoutMs = options?.timeoutMs ?? 240_000
   if (options?.signal?.aborted) {
     throw Object.assign(new Error('已取消'), { name: 'AbortError' })
@@ -300,12 +449,19 @@ export async function chatStream(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${settings.apiKey.trim()}`,
       },
-      body: JSON.stringify({
-        model: model.trim(),
-        messages,
-        temperature: settings.temperature,
-        stream: true,
-      }),
+      body: JSON.stringify(
+        style === 'responses'
+          ? buildResponsesPayload(messages, model.trim(), settings.temperature, true, options?.tools)
+          : {
+              model: model.trim(),
+              messages,
+              ...(typeof settings.temperature === 'number'
+                ? { temperature: settings.temperature }
+                : {}),
+              stream: true,
+              ...(options?.tools && options.tools.length > 0 ? { tools: options.tools } : {}),
+            },
+      ),
       signal: controller.signal,
     })
   } catch (error) {
@@ -342,6 +498,9 @@ export async function chatStream(
   let content = ''
   let usageIn = 0
   let usageOut = 0
+  // chat 协议的 tool_calls 是按 index 分片下发的，先聚合再归一
+  const toolCallAcc = new Map<number, { id: string; name: string; arguments: string }>()
+  let responsesToolCalls: ToolCall[] = []
 
   try {
     for (;;) {
@@ -365,13 +524,62 @@ export async function chatStream(
             }
           }>
           usage?: { prompt_tokens?: number; completion_tokens?: number }
+          // Responses API 的流事件
+          type?: string
+          delta?: string
+          response?: { usage?: { input_tokens?: number; output_tokens?: number } }
         }
         try {
           parsed = JSON.parse(chunk)
         } catch {
           continue
         }
-        const delta = parsed.choices?.[0]?.delta
+        if (style === 'responses') {
+          // Responses API：response.output_text.delta 出正文，
+          // response.reasoning_summary_text.delta 出思考摘要，response.completed 带用量
+          if (parsed.type === 'response.output_text.delta' && parsed.delta) {
+            content += parsed.delta
+            onDelta(parsed.delta)
+          } else if (parsed.type === 'response.reasoning_summary_text.delta' && parsed.delta) {
+            options?.onReasoning?.(parsed.delta)
+          } else if (parsed.type === 'response.completed' && parsed.response?.usage) {
+            usageIn = parsed.response.usage.input_tokens ?? usageIn
+            usageOut = parsed.response.usage.output_tokens ?? usageOut
+          }
+          // 工具调用：output_item.done 里的 function_call 项是完整参数，直接收
+          const item = (parsed as {
+            item?: { type?: string; call_id?: string; name?: string; arguments?: string }
+          }).item
+          if (parsed.type === 'response.output_item.done' && item?.type === 'function_call' && item.name) {
+            responsesToolCalls.push({
+              id: item.call_id ?? `call_${Math.random().toString(36).slice(2)}`,
+              name: String(item.name),
+              arguments: item.arguments ?? '{}',
+            })
+          }
+          continue
+        }
+        type StreamDelta = {
+          content?: string
+          reasoning_content?: string
+          reasoning?: string
+          thinking?: string
+          tool_calls?: Array<{
+            index?: number
+            id?: string
+            function?: { name?: string; arguments?: string }
+          }>
+        }
+        const streamDelta = parsed.choices?.[0]?.delta as StreamDelta | undefined
+        for (const call of streamDelta?.tool_calls ?? []) {
+          const index = call.index ?? 0
+          const current = toolCallAcc.get(index) ?? { id: '', name: '', arguments: '' }
+          if (call.id) current.id = call.id
+          if (call.function?.name) current.name += call.function.name
+          if (call.function?.arguments) current.arguments += call.function.arguments
+          toolCallAcc.set(index, current)
+        }
+        const delta = streamDelta
         if (typeof delta?.content === 'string' && delta.content) {
           content += delta.content
           onDelta(delta.content)
@@ -400,7 +608,16 @@ export async function chatStream(
     options?.signal?.removeEventListener('abort', onAbort)
   }
 
-  if (!content.trim()) {
+  const toolCalls = [...toolCallAcc.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, call]) => ({
+      id: call.id || `call_${Math.random().toString(36).slice(2)}`,
+      name: call.name,
+      arguments: call.arguments || '{}',
+    }))
+    .concat(responsesToolCalls)
+
+  if (!content.trim() && toolCalls.length === 0) {
     throw new LlmError('bad-response', '模型没有返回内容，请检查模型是否支持对话接口')
   }
 
@@ -411,6 +628,7 @@ export async function chatStream(
       messages.reduce((sum, message) => sum + estimateContentTokens(message.content), 0),
     outputTokens: usageOut || estimateTokens(content),
     model: model.trim(),
+    ...(toolCalls.length > 0 ? { toolCalls } : {}),
   }
 }
 

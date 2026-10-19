@@ -9,6 +9,7 @@ import { AppSettingsPage } from './pages/AppSettingsPage'
 import { AboutPage } from './pages/AboutPage'
 import { AuditPage } from './pages/AuditPage'
 import { BackupPage } from './pages/BackupPage'
+import { McpSettingsPage } from './pages/McpSettingsPage'
 import { ModelSettingsPage } from './pages/ModelSettingsPage'
 import { RunnerPage } from './pages/RunnerPage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -34,6 +35,7 @@ export function App() {
               <Route path="studio" element={<StudioPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="settings/model" element={<ModelSettingsPage />} />
+              <Route path="settings/mcp" element={<McpSettingsPage />} />
               <Route path="settings/usage" element={<UsagePage />} />
               <Route path="settings/backup" element={<BackupPage />} />
               <Route path="settings/audit" element={<AuditPage />} />

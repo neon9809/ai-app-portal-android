@@ -236,9 +236,18 @@ export function StudioPage() {
 
   const addAttachment = async () => {
     try {
-      const picked = await pickFile('image/*,.txt,.md,.json,.csv,text/*')
+      // 图片附件只在模型开启视觉能力时可选；否则只允许文本类文件
+      const settings = await readLlmSettings()
+      const vision = settings.vision
+      const picked = await pickFile(
+        vision ? 'image/*,.txt,.md,.markdown,.html' : '.txt,.md,.markdown,.html',
+      )
       if (!picked) return
       const isImage = /\.(png|jpe?g|webp|gif|bmp)$/i.test(picked.name)
+      if (isImage && !vision) {
+        toast({ title: t('model.visionBlocked'), description: t('model.visionBlockedDesc'), tone: 'warning' })
+        return
+      }
       if (isImage) {
         if (picked.bytes.byteLength > MAX_IMAGE_BYTES) {
           toast({ title: t('studio.imageTooLarge'), description: t('studio.imageTooLargeDesc'), tone: 'warning' })
