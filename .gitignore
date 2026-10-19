@@ -21,3 +21,4 @@ capsule/signing/*
 .project-basekit
 AGENTS.md
 CLAUDE.md
+tmp/

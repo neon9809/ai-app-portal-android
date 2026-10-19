@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronLeft, Menu, Plus } from 'lucide-react'
+import { ChevronLeft, KeyRound, Menu, Plus } from 'lucide-react'
 
 import { cn } from '@/shared/lib/cn'
+import { useModelConfigured } from '@/shared/hooks/useModelConfigured'
 import { PageTitleProvider } from './PageTitle'
 import { SideMenu } from './SideMenu'
 import { TopBleedScrim } from './TopBleedScrim'
@@ -23,6 +24,7 @@ export function AppShell() {
   const [pageTitle, setPageTitle] = useState<string>()
   const [topBleed, setTopBleed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const modelReady = useModelConfigured()
 
   const isHome = pathname === '/'
   const hasHeader = isHome || pageTitle !== undefined
@@ -76,7 +78,7 @@ export function AppShell() {
               {title}
             </h1>
 
-            {isHome && (
+            {isHome && modelReady && (
               <button
                 type="button"
                 onClick={() => navigate('/studio')}
@@ -84,6 +86,17 @@ export function AppShell() {
                 className="-mr-2 flex size-11 items-center justify-center rounded-md text-primary active:bg-accent"
               >
                 <Plus className="size-6" aria-hidden />
+              </button>
+            )}
+
+            {isHome && !modelReady && (
+              <button
+                type="button"
+                onClick={() => navigate('/settings/model')}
+                className="-mr-2 flex min-h-tap items-center gap-1 rounded-md px-2 text-caption font-medium text-primary active:bg-accent"
+              >
+                <KeyRound className="size-4" aria-hidden />
+                添加大模型API
               </button>
             )}
           </div>

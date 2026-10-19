@@ -5,7 +5,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react'
@@ -31,11 +30,21 @@ import { Button } from '@/shared/ui/Button'
 
 const SEEN_KEY = 'onboardingSeenV2'
 
-const EXAMPLES = ['记每天喝了几杯水', '做个没有广告的番茄钟']
+const EXAMPLES = ['帮我做一个可以弹奏的钢琴APP', '做个没有广告的番茄钟']
 
 const BUILD_STEPS = ['读懂你要什么', '画出界面', '写好逻辑和存储', '在本机自检'] as const
 
-const DEMO_GOAL = 8
+/** 口袋里的小钢琴：八个白键，C4–C5 */
+const PIANO_KEYS = [
+  { note: 'Do', freq: 261.63 },
+  { note: 'Re', freq: 293.66 },
+  { note: 'Mi', freq: 329.63 },
+  { note: 'Fa', freq: 349.23 },
+  { note: 'Sol', freq: 392.0 },
+  { note: 'La', freq: 440.0 },
+  { note: 'Si', freq: 493.88 },
+  { note: 'Do', freq: 523.25 },
+] as const
 
 type Scene = 'say' | 'build' | 'use'
 
@@ -148,6 +157,19 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
   const [scene, setScene] = useState<Scene>('say')
   const [draft, setDraft] = useState('')
   const [built, setBuilt] = useState('')
+  const [modelReady, setModelReady] = useState(true)
+
+  useEffect(() => {
+    let alive = true
+    void readLlmSettings()
+      .then((settings) => {
+        if (alive) setModelReady(isLlmConfigured(settings))
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
 
   // 进入时把焦点放到弹层本身，但不自动聚焦输入框（避免一进来就弹键盘）
   useEffect(() => {
@@ -278,7 +300,9 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
       <main className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-6">
         {scene === 'say' && <SayScene initialDraft={draft} onStart={startBuild} />}
         {scene === 'build' && <BuildScene brief={built} onDone={goUse} onSkip={goUse} />}
-        {scene === 'use' && <UseScene brief={built} onConfigure={configureModel} />}
+        {scene === 'use' && (
+          <UseScene brief={built} modelReady={modelReady} onConfigure={configureModel} />
+        )}
         <p className="sr-only" aria-live="polite">
           {SCENE_ANNOUNCE[scene]}
         </p>
@@ -290,11 +314,16 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
             <Button
               block
               size="lg"
-              onClick={onDone}
+              onClick={modelReady ? onDone : configureModel}
               className="bg-primary-foreground text-primary hover:brightness-100"
             >
-              开始使用
+              {modelReady ? '开始使用' : '添加大模型API'}
             </Button>
+            {!modelReady && (
+              <p className="mt-2 text-center text-caption text-primary-foreground/80">
+                生成工具需要一个模型服务，Key 只保存在这台手机上
+              </p>
+            )}
           </div>
         </footer>
       )}
@@ -497,7 +526,7 @@ function DotStage({
 /** 应用图标里的九点小标：结果卡片的图标，和舞台是同一套语言 */
 function MiniMark({ className }: { className?: string }) {
   return (
-    <span className={cn('grid grid-cols-3 gap-[3px]', className)}>
+    <span className={cn('grid grid-cols-3 gap-1', className)}>
       {Array.from({ length: 9 }).map((_, index) => (
         <span
           key={index}
@@ -616,7 +645,7 @@ function BuildScene({
                       state === 'done'
                         ? 'bg-primary text-primary-foreground'
                         : state === 'active'
-                          ? 'border-2 border-primary'
+                          ? 'border border-primary'
                           : 'border border-border',
                     )}
                   >
@@ -676,29 +705,15 @@ function BuildScene({
  * 第三幕：直接用
  * ------------------------------------------------------------------ */
 
-function UseScene({ brief, onConfigure }: { brief: string; onConfigure: () => void }) {
-  const [cups, setCups] = useState(0)
-  const [modelReady, setModelReady] = useState(true)
-
-  useEffect(() => {
-    let alive = true
-    void readLlmSettings()
-      .then((settings) => {
-        if (alive) setModelReady(isLlmConfigured(settings))
-      })
-      .catch(() => undefined)
-    return () => {
-      alive = false
-    }
-  }, [])
-
-  const full = cups === DEMO_GOAL
-
-  const drink = () => {
-    tick('medium')
-    setCups((current) => (current >= DEMO_GOAL ? 0 : current + 1))
-  }
-
+function UseScene({
+  brief,
+  modelReady,
+  onConfigure,
+}: {
+  brief: string
+  modelReady: boolean
+  onConfigure: () => void
+}) {
   return (
     <div className="onboarding-scene flex min-h-full flex-col">
       <div className="my-auto">
@@ -716,7 +731,7 @@ function UseScene({ brief, onConfigure }: { brief: string; onConfigure: () => vo
               <MiniMark />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-title font-semibold">喝水打卡</p>
+              <p className="text-title font-semibold">口袋钢琴</p>
               <p className="text-caption text-muted-foreground">一句话生成 · 点两下试试</p>
             </div>
             <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption text-muted-foreground">
@@ -724,52 +739,10 @@ function UseScene({ brief, onConfigure }: { brief: string; onConfigure: () => vo
             </span>
           </header>
 
-          <div className="relative mt-4">
-            <div className="grid grid-cols-4 justify-items-center gap-x-2 gap-y-2.5" aria-hidden>
-              {Array.from({ length: DEMO_GOAL }).map((_, index) => {
-                const filled = index < cups
-                const goal = index === DEMO_GOAL - 1
-                return (
-                  <span
-                    key={index}
-                    className={cn(
-                      'grid size-9 place-items-center rounded-full border-2 transition-colors duration-200',
-                      filled
-                        ? goal
-                          ? 'border-spark bg-spark'
-                          : 'border-primary bg-primary'
-                        : goal
-                          ? 'border-spark/55 bg-surface'
-                          : 'border-border bg-surface',
-                      filled && index === cups - 1 && 'onboarding-pop',
-                    )}
-                  >
-                    {filled && (
-                      <Check
-                        className={cn(
-                          'size-4',
-                          goal ? 'text-spark-foreground' : 'text-primary-foreground',
-                        )}
-                        strokeWidth={3}
-                      />
-                    )}
-                  </span>
-                )
-              })}
-            </div>
-            {full && <Burst />}
-          </div>
-
-          <p className="mt-2 text-center text-caption text-muted-foreground" aria-live="polite">
-            {full ? `今天 ${DEMO_GOAL} 杯，喝够了` : `今天 ${cups} / ${DEMO_GOAL} 杯`}
-          </p>
-
-          <Button block className="mt-2" onClick={drink}>
-            {full ? '再来一轮' : '喝一杯'}
-          </Button>
+          <PocketPiano />
 
           <p className="mt-2 text-center text-caption text-muted-foreground">
-            记录只保存在这台手机上
+            声音走系统媒体音量，弹奏不会上传
           </p>
         </section>
 
@@ -792,26 +765,76 @@ function UseScene({ brief, onConfigure }: { brief: string; onConfigure: () => vo
   )
 }
 
-/** 完成时的粒子：从杯子阵列中心散开 */
-function Burst() {
+/** 演示用的小钢琴：Web Audio 合成，不加载任何外部音频 */
+function PocketPiano() {
+  const [played, setPlayed] = useState<number | null>(null)
+  const audioRef = useRef<AudioContext | null>(null)
+  const resetRef = useRef<number | null>(null)
+
+  useEffect(
+    () => () => {
+      if (resetRef.current !== null) window.clearTimeout(resetRef.current)
+      void audioRef.current?.close().catch(() => undefined)
+    },
+    [],
+  )
+
+  const play = (index: number) => {
+    tick('light')
+    setPlayed(index)
+    if (resetRef.current !== null) window.clearTimeout(resetRef.current)
+    resetRef.current = window.setTimeout(() => setPlayed(null), 260)
+    try {
+      const Ctor =
+        window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!Ctor) return
+      const context = audioRef.current ?? new Ctor()
+      audioRef.current = context
+      void context.resume()
+      const now = context.currentTime
+      const oscillator = context.createOscillator()
+      const gain = context.createGain()
+      oscillator.type = 'triangle'
+      oscillator.frequency.value = PIANO_KEYS[index].freq
+      gain.gain.setValueAtTime(0.0001, now)
+      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.012)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.05)
+      oscillator.connect(gain)
+      gain.connect(context.destination)
+      oscillator.start(now)
+      oscillator.stop(now + 1.1)
+    } catch {
+      // 浏览器禁用音频时静默，演示仍可继续
+    }
+  }
+
   return (
-    <span className="onboarding-burst" aria-hidden>
-      {Array.from({ length: 12 }).map((_, index) => {
-        const angle = (index / 12) * Math.PI * 2
-        return (
-          <span
-            key={index}
-            className="onboarding-burst-dot"
-            style={
-              {
-                '--dx': `${Math.cos(angle) * 52}px`,
-                '--dy': `${Math.sin(angle) * 52}px`,
-                animationDelay: `${index * 14}ms`,
-              } as CSSProperties
-            }
-          />
-        )
-      })}
-    </span>
+    <div className="mt-4">
+      <div className="flex h-32 items-stretch gap-1" role="group" aria-label="口袋钢琴琴键">
+        {PIANO_KEYS.map((key, index) => (
+          <button
+            key={`${key.note}-${index}`}
+            type="button"
+            onClick={() => play(index)}
+            aria-label={`弹 ${key.note}`}
+            className={cn(
+              'flex min-w-0 flex-1 flex-col items-center justify-end rounded-b-lg border border-border pb-2 text-caption transition-transform duration-100',
+              index === PIANO_KEYS.length - 1
+                ? 'bg-spark-soft text-spark'
+                : 'bg-background text-muted-foreground',
+              played === index
+                ? '-translate-y-1 border-primary bg-primary-soft text-primary shadow-sm'
+                : 'active:translate-y-0.5',
+            )}
+          >
+            {key.note}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-center text-caption text-muted-foreground" aria-live="polite">
+        {played === null ? '点一下琴键，听听看' : `正在弹 ${PIANO_KEYS[played].note}`}
+      </p>
+    </div>
   )
 }

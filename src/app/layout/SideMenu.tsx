@@ -1,10 +1,11 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { CircleHelp, FileUp, Plus, Settings, Sparkles, X } from 'lucide-react'
+import { CircleHelp, FileUp, KeyRound, Plus, Settings, Sparkles, X } from 'lucide-react'
 
 import logo from '@/assets/app-mark.svg'
 import { useImport } from '@/app/components/ImportProvider'
 import { useOnboarding } from '@/app/components/Onboarding'
 import { cn } from '@/shared/lib/cn'
+import { useModelConfigured } from '@/shared/hooks/useModelConfigured'
 import { APP_NAME, APP_VERSION } from '@/shared/config/app'
 
 interface SideMenuProps {
@@ -18,6 +19,7 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
   const { pathname } = useLocation()
   const { openImport } = useImport()
   const { open: openOnboarding } = useOnboarding()
+  const modelReady = useModelConfigured()
 
   const go = (to: string) => {
     onClose()
@@ -78,11 +80,15 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
             </button>
             <button
               type="button"
-              onClick={() => go('/studio')}
+              onClick={() => go(modelReady ? '/studio' : '/settings/model')}
               className="flex min-h-tap w-full items-center gap-3 rounded-md px-3 text-body active:bg-accent"
             >
-              <Plus className="size-5 shrink-0" aria-hidden />
-              造一个新工具
+              {modelReady ? (
+                <Plus className="size-5 shrink-0" aria-hidden />
+              ) : (
+                <KeyRound className="size-5 shrink-0" aria-hidden />
+              )}
+              {modelReady ? '造一个新工具' : '添加大模型API'}
             </button>
             <button
               type="button"

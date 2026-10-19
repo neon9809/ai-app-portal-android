@@ -1052,7 +1052,7 @@ function StepList({
           <li key={step.id} className="relative">
             {index < steps.length - 1 && (
               <span
-                className="absolute left-2 top-7 h-[calc(100%-12px)] w-px bg-border"
+                className="absolute left-3 top-7 h-[calc(100%-12px)] w-px bg-border"
                 aria-hidden
               />
             )}

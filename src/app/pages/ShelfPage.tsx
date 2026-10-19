@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MoreHorizontal, Plus } from 'lucide-react'
+import { KeyRound, MoreHorizontal, Plus } from 'lucide-react'
 
 import emptyIllustration from '@/assets/app-empty.svg'
 import { cn } from '@/shared/lib/cn'
+import { useModelConfigured } from '@/shared/hooks/useModelConfigured'
 import { listApps } from '@/shared/portal/db'
 import type { PortalApp } from '@/shared/portal/types'
 import { formatRelativeTime } from '@/shared/portal/utils'
@@ -22,6 +23,7 @@ import { useToast } from '@/shared/ui/Toast'
 export function ShelfPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const modelReady = useModelConfigured()
   const [apps, setApps] = useState<PortalApp[] | null>(null)
 
   const refresh = useCallback(async () => {
@@ -67,9 +69,15 @@ export function ShelfPage() {
           title="还没有应用"
           description="点右上角的 +，用一句话说说你想做的小工具。"
           action={
-            <Button onClick={() => navigate('/studio')}>
-              <Plus className="size-4" aria-hidden />
-              造第一个
+            <Button
+              onClick={() => navigate(modelReady ? '/studio' : '/settings/model')}
+            >
+              {modelReady ? (
+                <Plus className="size-4" aria-hidden />
+              ) : (
+                <KeyRound className="size-4" aria-hidden />
+              )}
+              {modelReady ? '造第一个' : '添加大模型API'}
             </Button>
           }
           className="min-h-[58dvh] justify-center"
