@@ -8,7 +8,8 @@
  * 1. 字面量色值只允许出现在本文件，其它任何文件都必须使用 token 或 Tailwind 语义类。
  * 2. token 用「空格分隔的 RGB 通道」书写，便于 Tailwind 用 rgb(var(--x) / <alpha-value>) 支持透明度。
  * 3. 语义 token 必须成对提供前景与背景，对比度 ≥ 4.5:1（门禁 G44 会算）。
- * 4. 只有一套配色：不写 dark: 变体、不做配色切换。
+ * 4. 主题：默认跟随系统，可在设置里切浅色 / 深色。深色用 html[data-theme='dark'] 覆盖
+ *    同一组语义 token，组件里不写 dark: 变体，保证只有一套结构。
  * ========================================================================== */
 
 :root {
@@ -32,6 +33,7 @@
   --brand-50: 232 237 255;
   --brand-100: 211 221 255;
   --brand-300: 138 162 255;
+  --brand-500: 43 92 230;
   --brand-600: 13 60 214;
   --brand-700: 10 48 176;
   --brand-900: 8 32 110;
@@ -59,6 +61,12 @@
   --primary: var(--brand-600);
   --primary-foreground: var(--gray-0);
   --primary-soft: var(--brand-50);
+  /* 品牌蓝固定值：不随主题变化（引导页整屏、白色 CTA 上的品牌字等） */
+  --brand: var(--brand-600);
+  --brand-foreground: var(--gray-0);
+  /* 代码/实时输出控制台：深色模式下也保持深底浅字 */
+  --console: var(--gray-900);
+  --console-foreground: var(--gray-100);
 
   --secondary: var(--gray-150);
   --secondary-foreground: 46 52 66;
@@ -133,4 +141,66 @@
   --safe-bottom: var(--sab, env(safe-area-inset-bottom, 0px));
   --safe-left: var(--sal, env(safe-area-inset-left, 0px));
   --safe-right: var(--sar, env(safe-area-inset-right, 0px));
+}
+
+
+/* =============================================================================
+ * 深色主题
+ *
+ * 只覆盖语义 token，组件结构不变。默认跟随系统；用户可在「设置 → 外观」里
+ * 固定为浅色 / 深色（见 src/shared/theme.ts）。
+ * primary 在深色下用稍亮的宝蓝（brand-500），既保留品牌感，又保证按钮、点阵
+ * 在深灰底上有足够对比；文字/图标用的 text-primary 由 globals.css 提亮到 brand-300。
+ * ========================================================================== */
+html[data-theme='dark'] {
+  color-scheme: dark;
+
+  --background: var(--gray-950);
+  --foreground: var(--gray-100);
+
+  --surface: var(--gray-900);
+  --surface-foreground: var(--gray-100);
+  --surface-muted: var(--gray-850);
+
+  --muted: var(--gray-850);
+  --muted-foreground: var(--gray-400);
+
+  --primary: var(--brand-500);
+  --primary-foreground: var(--gray-0);
+  --primary-soft: var(--brand-900);
+
+  --secondary: var(--gray-800);
+  --secondary-foreground: var(--gray-150);
+
+  --accent: var(--gray-850);
+  --accent-foreground: var(--gray-50);
+
+  --spark: var(--orange-600);
+  --spark-foreground: var(--gray-0);
+  /* 深琥珀底：询问卡、钢琴键这类浅金底在深色下的替代 */
+  --spark-soft: 58 41 15;
+  --spark-bright: var(--orange-600);
+
+  --success: 134 239 172;
+  --success-foreground: var(--gray-950);
+  --warning: 251 191 36;
+  --warning-foreground: var(--gray-950);
+  --danger: 248 113 113;
+  --danger-foreground: var(--gray-950);
+
+  --border: var(--gray-800);
+  --input: var(--gray-700);
+  --ring: var(--brand-300);
+  --overlay: var(--gray-1000);
+
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.6);
+
+  --console: 8 10 15;
+  --console-foreground: 230 235 245;
+
+  /* 品牌蓝不随主题变化（引导页整屏、白底品牌字） */
+  --brand: var(--brand-600);
+  --brand-foreground: var(--gray-0);
 }

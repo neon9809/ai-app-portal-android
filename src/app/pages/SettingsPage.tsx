@@ -5,30 +5,54 @@ import {
   Cpu,
   Gauge,
   Info,
+  Languages,
+  Monitor,
+  Moon,
   ScrollText,
   ShieldCheck,
+  Sun,
+  SunMoon,
+  type LucideIcon,
 } from 'lucide-react'
 
 import { usePageTitle } from '@/app/layout/PageTitle'
+import { LOCALE_LABELS, useI18n } from '@/shared/i18n'
 import { APP_NAME, APP_VERSION } from '@/shared/config/app'
+import { cn } from '@/shared/lib/cn'
 import { listApps, listAudit, listUsage, settingGet } from '@/shared/portal/db'
 import { isLlmConfigured, readLlmSettings } from '@/shared/portal/llm'
 import { formatRelativeTime } from '@/shared/portal/utils'
+import { getThemePreference, setThemePreference, type ThemePreference } from '@/shared/theme'
+import {
+  getLocalePreference,
+  setLocalePreference,
+  type LocalePreference,
+} from '@/shared/i18n'
 import { DotField, DotTile } from '@/shared/ui/Dot'
 
+const THEME_OPTIONS: Array<{ value: ThemePreference; labelKey: string; icon: LucideIcon }> = [
+  { value: 'system', labelKey: 'settings.themeSystem', icon: Monitor },
+  { value: 'light', labelKey: 'settings.themeLight', icon: Sun },
+  { value: 'dark', labelKey: 'settings.themeDark', icon: Moon },
+]
+
 export function SettingsPage() {
-  usePageTitle('设置')
+  const { t, locale } = useI18n()
+  usePageTitle(t('settings.title'))
   const navigate = useNavigate()
-  const [model, setModel] = useState('未配置')
+  const [model, setModel] = useState('—')
   const [tokens, setTokens] = useState(0)
   const [appCount, setAppCount] = useState(0)
   const [auditCount, setAuditCount] = useState(0)
   const [lastBackup, setLastBackup] = useState<number | null>(null)
+  const [theme, setTheme] = useState<ThemePreference>(() => getThemePreference())
+  const [localePref, setLocalePref] = useState<LocalePreference>(() => getLocalePreference())
 
   useEffect(() => {
+    setModel(t('settings.modelUnset'))
     void (async () => {
       const settings = await readLlmSettings()
-      setModel(isLlmConfigured(settings) ? settings.model : '未配置')
+      setModel(isLlmConfigured(settings) ? settings.model : t('settings.modelUnset'))
       const [usage, apps, audit, backup] = await Promise.all([
         listUsage(),
         listApps(),
@@ -40,7 +64,8 @@ export function SettingsPage() {
       setAuditCount(audit.length)
       setLastBackup(typeof backup === 'number' ? backup : null)
     })()
-  }, [])
+    // 跟随语言重跑：「未配置 / Not set up」这类状态文案要跟着切
+  }, [t])
 
   return (
     <div className="page">
@@ -51,7 +76,7 @@ export function SettingsPage() {
           <div className="min-w-0">
             <p className="text-title font-semibold">{APP_NAME}</p>
             <p className="mt-0.5 text-caption text-muted-foreground">
-              版本 {APP_VERSION} · 数据只在这台设备上
+              {t('settings.identityVersion', { version: APP_VERSION })}
             </p>
           </div>
         </div>
@@ -61,36 +86,110 @@ export function SettingsPage() {
         <ul>
           <SettingRow
             icon={Cpu}
-            title="AI 模型"
+            title={t('settings.model')}
             value={model}
             onClick={() => navigate('/settings/model')}
           />
           <SettingRow
             icon={Gauge}
-            title="用量与存储"
-            value={`${tokens} tokens · ${appCount} 个工具`}
+            title={t('settings.usage')}
+            value={t('settings.usageValue', { tokens, count: appCount })}
             onClick={() => navigate('/settings/usage')}
           />
           <SettingRow
             icon={ShieldCheck}
-            title="备份与恢复"
-            value={lastBackup ? `上次 ${formatRelativeTime(lastBackup)}` : '还没有备份'}
+            title={t('settings.backup')}
+            value={
+              lastBackup
+                ? t('settings.lastBackup', { time: formatRelativeTime(lastBackup, locale) })
+                : t('settings.noBackup')
+            }
             onClick={() => navigate('/settings/backup')}
           />
           <SettingRow
             icon={ScrollText}
-            title="审计日志"
-            value={`${auditCount} 条`}
+            title={t('settings.audit')}
+            value={t('settings.auditCount', { count: auditCount })}
             onClick={() => navigate('/settings/audit')}
           />
           <SettingRow
             icon={Info}
-            title="关于"
-            value={`版本 ${APP_VERSION} · 来源与许可`}
+            title={t('settings.about')}
+            value={t('settings.aboutValue', { version: APP_VERSION })}
             onClick={() => navigate('/settings/about')}
           />
         </ul>
       </div>
+
+      <section className="mt-3 rounded-lg border border-border bg-surface p-4">
+        <div className="flex items-center gap-2">
+          <SunMoon className="size-4 text-primary" aria-hidden />
+          <p className="text-body font-medium">{t('settings.appearance')}</p>
+        </div>
+        <p className="mt-0.5 text-caption text-muted-foreground">
+          {t('settings.appearanceHint')}
+        </p>
+        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t('settings.appearance')}>
+          {THEME_OPTIONS.map((option) => {
+            const Icon = option.icon
+            const selected = theme === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => {
+                  setThemePreference(option.value)
+                  setTheme(option.value)
+                }}
+                className={cn(
+                  'flex min-h-tap flex-col items-center justify-center gap-1 rounded-md border text-caption transition-colors duration-fast',
+                  selected
+                    ? 'border-primary bg-primary-soft font-medium text-primary'
+                    : 'border-border bg-surface text-foreground active:bg-accent',
+                )}
+              >
+                <Icon className="size-4" aria-hidden />
+                {t(option.labelKey)}
+              </button>
+            )
+          })}
+        </div>
+      </section>
+
+      <section className="mt-3 rounded-lg border border-border bg-surface p-4">
+        <div className="flex items-center gap-2">
+          <Languages className="size-4 text-primary" aria-hidden />
+          <p className="text-body font-medium">{t('settings.language')}</p>
+        </div>
+        <p className="mt-0.5 text-caption text-muted-foreground">{t('settings.languageHint')}</p>
+        <div className="mt-3 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t('settings.language')}>
+          {(['system', 'zh-CN', 'en-US'] as const).map((option) => {
+            const selected = localePref === option
+            return (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => {
+                  setLocalePreference(option)
+                  setLocalePref(option)
+                }}
+                className={cn(
+                  'flex min-h-tap flex-col items-center justify-center gap-1 rounded-md border text-caption transition-colors duration-fast',
+                  selected
+                    ? 'border-primary bg-primary-soft font-medium text-primary'
+                    : 'border-border bg-surface text-foreground active:bg-accent',
+                )}
+              >
+                {option === 'system' ? t('settings.langSystem') : LOCALE_LABELS[option]}
+              </button>
+            )
+          })}
+        </div>
+      </section>
     </div>
   )
 }

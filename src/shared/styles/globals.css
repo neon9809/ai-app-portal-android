@@ -684,9 +684,9 @@
 .toast-band {
   background-image: linear-gradient(
     to bottom,
-    rgb(var(--primary)) 0%,
-    rgb(var(--primary)) 62%,
-    rgb(var(--primary) / 0) 100%
+    rgb(var(--brand)) 0%,
+    rgb(var(--brand)) 62%,
+    rgb(var(--brand) / 0) 100%
   );
 }
 
@@ -720,6 +720,21 @@
   animation-name: toast-progress;
   animation-timing-function: linear;
   animation-fill-mode: forwards;
+}
+
+/* 深色主题：文字/图标用的品牌蓝提亮；primary 本身是稍亮的宝蓝，留给按钮与点阵底 */
+html[data-theme='dark'] .text-primary {
+  color: rgb(var(--brand-300));
+}
+
+/* 深色骨架屏：扫光换成浅色，避免和深底融在一起 */
+html[data-theme='dark'] .skeleton::after {
+  background-image: linear-gradient(
+    90deg,
+    transparent,
+    rgb(var(--foreground) / 0.08),
+    transparent
+  );
 }
 
 @media (prefers-reduced-motion: reduce) {

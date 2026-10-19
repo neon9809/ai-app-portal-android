@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { KeyRound, MoreHorizontal, Plus } from 'lucide-react'
+import { MoreHorizontal } from 'lucide-react'
 
 import emptyIllustration from '@/assets/app-empty.svg'
 import { cn } from '@/shared/lib/cn'
 import { useModelConfigured } from '@/shared/hooks/useModelConfigured'
+import { useI18n } from '@/shared/i18n'
 import { listApps } from '@/shared/portal/db'
 import type { PortalApp } from '@/shared/portal/types'
 import { formatRelativeTime } from '@/shared/portal/utils'
-import { Button } from '@/shared/ui/Button'
 import { DotMark } from '@/shared/ui/Dot'
 import { EmptyState } from '@/shared/ui/Feedback'
 import { useToast } from '@/shared/ui/Toast'
@@ -23,6 +23,7 @@ import { useToast } from '@/shared/ui/Toast'
 export function ShelfPage() {
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { t, locale } = useI18n()
   const modelReady = useModelConfigured()
   const [apps, setApps] = useState<PortalApp[] | null>(null)
 
@@ -36,7 +37,7 @@ export function ShelfPage() {
       setApps(list)
     } catch (error) {
       setApps([])
-      toast({ title: '本机存储不可用', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('shelf.storageFail'), description: (error as Error).message, tone: 'danger' })
     }
   }, [toast])
 
@@ -47,7 +48,7 @@ export function ShelfPage() {
   if (apps === null) {
     return (
       <div className="page">
-        <div className="grid grid-cols-2 gap-3" role="status" aria-label="加载中">
+        <div className="grid grid-cols-2 gap-3" role="status" aria-label={t('shelf.loading')}>
           {[0, 1, 2, 3].map((index) => (
             <div key={index} className="rounded-xl border border-border bg-surface p-3">
               <div className="skeleton size-12 rounded-lg" />
@@ -66,19 +67,11 @@ export function ShelfPage() {
       <div className="page">
         <EmptyState
           illustration={<img src={emptyIllustration} alt="" className="h-28" />}
-          title="还没有应用"
-          description="点右上角的 +，用一句话说说你想做的小工具。"
-          action={
-            <Button
-              onClick={() => navigate(modelReady ? '/studio' : '/settings/model')}
-            >
-              {modelReady ? (
-                <Plus className="size-4" aria-hidden />
-              ) : (
-                <KeyRound className="size-4" aria-hidden />
-              )}
-              {modelReady ? '造第一个' : '添加大模型API'}
-            </Button>
+          title={t('shelf.emptyTitle')}
+          description={
+            modelReady
+              ? t('shelf.emptyHintReady')
+              : t('shelf.emptyHintNoModel')
           }
           className="min-h-[58dvh] justify-center"
         />
@@ -88,21 +81,14 @@ export function ShelfPage() {
 
   return (
     <div className="page">
-      <p className="mb-3 flex items-center gap-2 text-caption text-muted-foreground">
-        <DotMark size="xs" />
-        <span>{apps.length} 个工具</span>
-        <span aria-hidden>·</span>
-        <span>数据只在这台设备上</span>
-      </p>
-
       <ul className="grid grid-cols-2 gap-3">
         {apps.map((app) => {
           const pending = !app.html
           const meta = pending
-            ? '未完成 · 继续生成'
+            ? t('shelf.pendingResume')
             : app.lastOpenedAt > 0
-              ? `用过 · ${formatRelativeTime(app.lastOpenedAt)}`
-              : '还没打开过'
+              ? t('shelf.usedAt', { time: formatRelativeTime(app.lastOpenedAt, locale) })
+              : t('shelf.neverOpened')
           return (
             <li key={app.id} className="relative">
               <button
@@ -118,7 +104,7 @@ export function ShelfPage() {
                 </span>
                 <span className="line-clamp-1 w-full text-body font-medium">{app.name}</span>
                 <span className="line-clamp-2 min-h-[32px] w-full text-caption text-muted-foreground">
-                  {pending ? '上次生成没有完成，需求和附件还在。' : app.description}
+                  {pending ? t('shelf.pendingDesc') : app.description}
                 </span>
                 <span
                   className={cn(
@@ -139,7 +125,7 @@ export function ShelfPage() {
               <button
                 type="button"
                 onClick={() => navigate(`/app/${app.id}/detail`)}
-                aria-label={`${app.name} 的详情`}
+                aria-label={t('shelf.detailOf', { name: app.name })}
                 className="absolute right-0.5 top-0.5 flex size-11 items-center justify-center rounded-full text-muted-foreground active:bg-accent"
               >
                 <MoreHorizontal className="size-4" aria-hidden />
@@ -148,6 +134,13 @@ export function ShelfPage() {
           )
         })}
       </ul>
+
+      <p className="mt-4 flex items-center justify-center gap-2 text-caption text-muted-foreground">
+        <DotMark size="xs" />
+        <span>{t('shelf.metaCount', { count: apps.length })}</span>
+        <span aria-hidden>·</span>
+        <span>{t('shelf.metaLocal')}</span>
+      </p>
     </div>
   )
 }

@@ -20,8 +20,19 @@ export function formatBytes(bytes: number): string {
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[index]}`
 }
 
-export function formatRelativeTime(timestamp: number): string {
+/**
+ * 相对时间。locale 跟随 i18n（'zh-CN' | 'en-US'），英文用 Intl.RelativeTimeFormat。
+ */
+export function formatRelativeTime(timestamp: number, locale = 'zh-CN'): string {
   const diff = Date.now() - timestamp
+  if (locale === 'en-US') {
+    const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+    if (diff < 60_000) return 'just now'
+    if (diff < 3_600_000) return rtf.format(-Math.floor(diff / 60_000), 'minute')
+    if (diff < 86_400_000) return rtf.format(-Math.floor(diff / 3_600_000), 'hour')
+    if (diff < 7 * 86_400_000) return rtf.format(-Math.floor(diff / 86_400_000), 'day')
+    return new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
   if (diff < 60_000) return '刚刚'
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`

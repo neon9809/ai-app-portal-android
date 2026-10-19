@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react'
+import { useI18n } from '@/shared/i18n'
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'danger'
 
@@ -49,6 +50,7 @@ const TONE_ICON = {
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([])
   const nextId = useRef(0)
+  const { t } = useI18n()
 
   const dismiss = useCallback((id: number) => {
     setItems((prev) => prev.filter((item) => item.id !== id))
@@ -99,7 +101,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   type="button"
                   onClick={() => dismiss(item.id)}
                   className="pointer-events-auto -mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center rounded-full text-primary-foreground/80 active:bg-primary-foreground/15"
-                  aria-label="关闭提示"
+                  aria-label={t('common.closeToast')}
                 >
                   <X className="size-4" aria-hidden />
                 </button>

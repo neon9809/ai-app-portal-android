@@ -16,6 +16,7 @@ import {
   saveTrigger,
 } from './db'
 import type { AppTrigger, TriggerAction, TriggerEvent } from './types'
+import { resolveLocale, translate, type Locale } from '@/shared/i18n'
 import { now, uid } from './utils'
 
 export const MAX_TRIGGER_NAME = 40
@@ -139,23 +140,22 @@ export function normalizeTrigger(
 }
 
 /** 给设置页看的中文条件描述 */
-export function describeTrigger(trigger: AppTrigger): string {
+export function describeTrigger(trigger: AppTrigger, locale: Locale = resolveLocale()): string {
+  const tr = (key: string, params?: Record<string, string | number>) =>
+    translate(locale, key, params)
   if (trigger.kind === 'location' && trigger.location) {
     const { radiusMeters, mode, latitude, longitude } = trigger.location
-    return `${mode === 'leave' ? '离开' : '进入'} ${latitude.toFixed(4)}, ${longitude.toFixed(
-      4,
-    )} 周边 ${radiusMeters} 米`
+    const params = { lat: latitude.toFixed(4), lng: longitude.toFixed(4), radius: radiusMeters }
+    return mode === 'leave' ? tr('trigger.leave', params) : tr('trigger.enter', params)
   }
   const schedule = trigger.schedule
-  if (!schedule) return '未设置条件'
-  if (schedule.type === 'once') return `一次性 · ${formatDateTime(schedule.at)}`
+  if (!schedule) return tr('trigger.unset')
+  if (schedule.type === 'once') return tr('trigger.once', { time: formatDateTime(schedule.at) })
   if (schedule.type === 'daily') {
-    return `每天 ${String(schedule.hour).padStart(2, '0')}:${String(schedule.minute).padStart(
-      2,
-      '0',
-    )}`
+    const time = `${String(schedule.hour).padStart(2, '0')}:${String(schedule.minute).padStart(2, '0')}`
+    return tr('trigger.daily', { time })
   }
-  return `每 ${schedule.everyMinutes} 分钟`
+  return tr('trigger.interval', { minutes: schedule.everyMinutes })
 }
 
 export function formatDateTime(at: number): string {

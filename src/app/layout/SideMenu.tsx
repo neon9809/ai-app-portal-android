@@ -4,6 +4,7 @@ import { CircleHelp, FileUp, KeyRound, Plus, Settings, Sparkles, X } from 'lucid
 import logo from '@/assets/app-mark.svg'
 import { useImport } from '@/app/components/ImportProvider'
 import { useOnboarding } from '@/app/components/Onboarding'
+import { useI18n } from '@/shared/i18n'
 import { cn } from '@/shared/lib/cn'
 import { useModelConfigured } from '@/shared/hooks/useModelConfigured'
 import { APP_NAME, APP_VERSION } from '@/shared/config/app'
@@ -17,6 +18,7 @@ interface SideMenuProps {
 export function SideMenu({ open, onClose }: SideMenuProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { t } = useI18n()
   const { openImport } = useImport()
   const { open: openOnboarding } = useOnboarding()
   const modelReady = useModelConfigured()
@@ -45,20 +47,20 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
         )}
         role="dialog"
         aria-modal="true"
-        aria-label="菜单"
+        aria-label={t('menu.label')}
       >
         <div className="flex items-center gap-2.5 px-4 pb-3 pt-safe-top">
           <div className="mt-3 flex min-w-0 flex-1 items-center gap-2.5">
             <img src={logo} alt="" className="size-9 rounded-md" />
             <div className="min-w-0">
               <p className="truncate text-body font-medium">{APP_NAME}</p>
-              <p className="text-caption text-muted-foreground">本地应用工厂</p>
+              <p className="text-caption text-muted-foreground">{t('app.tagline')}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="关闭菜单"
+            aria-label={t('menu.close')}
             className="mt-3 flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-accent"
           >
             <X className="size-5" aria-hidden />
@@ -76,7 +78,7 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
               )}
             >
               <Sparkles className="size-5 shrink-0" aria-hidden />
-              我的应用
+              {t('nav.myApps')}
             </button>
             <button
               type="button"
@@ -88,7 +90,7 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
               ) : (
                 <KeyRound className="size-5 shrink-0" aria-hidden />
               )}
-              {modelReady ? '造一个新工具' : '添加大模型API'}
+              {modelReady ? t('menu.newTool') : t('menu.addModelApi')}
             </button>
             <button
               type="button"
@@ -99,7 +101,7 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
               className="flex min-h-tap w-full items-center gap-3 rounded-md px-3 text-body active:bg-accent"
             >
               <FileUp className="size-5 shrink-0" aria-hidden />
-              导入应用文件
+              {t('menu.import')}
             </button>
             <button
               type="button"
@@ -110,7 +112,7 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
               className="flex min-h-tap w-full items-center gap-3 rounded-md px-3 text-body active:bg-accent"
             >
               <CircleHelp className="size-5 shrink-0" aria-hidden />
-              使用说明
+              {t('menu.guide')}
             </button>
           </div>
 
@@ -126,13 +128,13 @@ export function SideMenu({ open, onClose }: SideMenuProps) {
               )}
             >
               <Settings className="size-5 shrink-0" aria-hidden />
-              设置
+              {t('menu.settings')}
             </button>
           </div>
         </nav>
 
         <p className="px-4 pb-3 pt-2 text-caption text-muted-foreground">
-          版本 {APP_VERSION} · 数据只保存在本机
+          {t('menu.versionLocal', { version: APP_VERSION })}
         </p>
         <div className="pb-safe-bottom" />
       </aside>

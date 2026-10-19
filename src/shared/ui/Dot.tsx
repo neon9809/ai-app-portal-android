@@ -80,7 +80,7 @@ export function DotTile({
 }) {
   return (
     <span
-      className={cn('inline-grid shrink-0 place-items-center bg-primary', TILE_SIZE[size], className)}
+      className={cn('inline-grid shrink-0 place-items-center bg-brand', TILE_SIZE[size], className)}
       aria-hidden
     >
       <DotMark size={size === 'lg' ? 'lg' : 'md'} tone="inverse" />

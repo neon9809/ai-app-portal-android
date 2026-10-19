@@ -7,8 +7,30 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="color-scheme" content="light" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#f9fafd" />
+    <!-- 首帧前落地主题，避免深色模式先闪一下浅色。键名与 src/shared/theme.ts 保持一致。
+         这里的色值只用于浏览器状态栏底色，首帧后由 theme.ts 从 token 重新写入。 -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('portal-theme')
+          var theme =
+            saved === 'light' || saved === 'dark'
+              ? saved
+              : window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          var root = document.documentElement
+          root.dataset.theme = theme
+          root.style.colorScheme = theme
+          var meta = document.querySelector('meta[name="theme-color"]')
+          if (meta) meta.setAttribute('content', theme === 'dark' ? '#0e1118' : '#f9fafd')
+        } catch (error) {
+          // 存储不可用：保持默认浅色
+        }
+      })()
+    </script>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="format-detection" content="telephone=no,email=no,address=no" />
     <!-- 登录态作用域：App UI 与 Admin UI 各自独立保存会话，同源部署 / 预览下也不会互相串号。

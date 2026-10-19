@@ -18,6 +18,11 @@ import {
   type LlmSettings,
 } from './llm'
 import { runSandboxProbe, type RuntimeIssue } from './sandbox'
+import { resolveLocale, translate } from '@/shared/i18n'
+
+/** 生成器里的用户可见文案（任务标题 / 步骤名 / 时间线）跟随当前语言 */
+const tr = (key: string, params?: Record<string, string | number>) =>
+  translate(resolveLocale(), key, params)
 import { DEVICE_ABILITIES, DEVICE_GROUP_ORDER, DEVICE_GROUPS, isDeviceGroup } from './device'
 import type {
   AppCapabilities,
@@ -202,6 +207,13 @@ function deviceGroupPrompt(): string {
   ).join('\n')
 }
 
+/** 生成应用的界面语言跟随门户语言 */
+function uiLanguageLine(): string {
+  return resolveLocale() === 'en-US'
+    ? '5. The app UI must be written in English.'
+    : '5. 简体中文界面。'
+}
+
 function buildSystemPrompt(): string {
   return `你是「AI应用门户」的应用生成器，为一个完全没有编程经验的用户生成一个可直接运行的单文件网页工具。
 你只输出一个 JSON 对象，不要输出 Markdown 代码围栏、不要解释、不要输出 JSON 以外的任何文字。
@@ -239,7 +251,7 @@ JSON 结构（字段必须齐全）：
 2. 不要做应用内标题栏或页头：不要重复应用名、不要大标题区；页面直接从核心内容开始，需要分区时用小节标题（16px、次级颜色）而不是占一整块的页头。
 3. 设置收进折叠面板：应用自己的设置项（开关、偏好、选项）默认收起，入口是右上角一个 ⚙ 图标按钮，点开弹出底部面板或抽屉；主界面只放核心内容与操作，不要把设置平铺在主界面上。⚙ 按钮必须做成半透明、不挡内容：放在页面边角（右上或右下），主内容区要为它让位（加内边距或错开布局），任何情况下不得遮挡核心功能的显示与点击区域。
 4. 移动端优先，适配 360 到 430px 宽；正文 16px，按钮至少 44px 高。
-5. 简体中文界面。所有状态齐全：加载中、空数据、出错都有明确提示。
+${uiLanguageLine()} 所有状态齐全：加载中、空数据、出错都有明确提示（界面上的文字按第 5 条的语言写）。
 6. 视觉干净克制：一层卡片或分组列表即可，不要卡片套卡片、不要重阴影、不要渐变堆叠。颜色用一个主色 + 中性灰，主色不要用默认蓝紫。
 7. 图标用 emoji 或内联 SVG，不使用外部图片。
 
@@ -671,9 +683,9 @@ function startHeartbeat(appId: string): () => void {
       job.phase === 'checking' || job.phase === 'repairing'
         ? job.message
         : job.thinking
-          ? '模型正在思考'
+          ? tr('gen.thinking')
           : job.live
-            ? '模型正在写代码'
+            ? tr('gen.writing')
             : job.message
     if (message !== job.message) patchJob(appId, { message })
   }, 4000)
@@ -836,6 +848,7 @@ function buildPlanMessages(app: PortalApp): ChatMessage[] {
 规则：
 - steps 给 3 到 4 步，从界面搭建到最后打磨，最后一步自然是你写出完整应用；步骤要具体到这个需求，不要写「开始」「完成」这类空话。
 - questions 只提「答案会明显改变做法、且你无法合理默认」的关键疑问（比如保存多久、以什么为单位统计）；最多 3 个，能自己定的就别问；每题给 2 到 4 个选项。没有就给空数组。
+- steps 的 title / detail 与 questions 里的文字一律用${resolveLocale() === 'en-US' ? '英文' : '简体中文'}书写，它们会直接展示给用户。
 
 【用户原话】
 ${app.requirements.brief}
@@ -867,7 +880,7 @@ ${plan.steps.map((item, index) => `${index + 1}. ${item.title}${item.detail ? `�
 ${Object.keys(answers).length ? `【用户已确认】
 ${Object.entries(answers).map(([id, answer]) => `- ${id}：${answer}`).join('\n')}` : ''}
 
-现在执行第 ${stepIndex + 1} 步「${step.title}」。输出 80 字以内的中文结论，说明这一步你打算怎么做、定了哪些关键点；不要输出代码，不要 JSON。`
+现在执行第 ${stepIndex + 1} 步「${step.title}」。输出 80 字以内的结论（用${resolveLocale() === 'en-US' ? '英文' : '中文'}），说明这一步你打算怎么做、定了哪些关键点；不要输出代码，不要 JSON。`
   return [{ role: 'user', content: text }]
 }
 
@@ -881,7 +894,7 @@ export function cancelJob(appId: string): void {
     askWaiters.delete(appId)
     waiter.reject(new CancelledError())
   }
-  patchJob(appId, { cancelled: true, phase: 'cancelled', message: '已取消' })
+  patchJob(appId, { cancelled: true, phase: 'cancelled', message: tr('gen.cancelled') })
 }
 
 class CancelledError extends Error {
@@ -999,13 +1012,13 @@ async function runStreamingChat(
     }
     patchJob(appId, {
       phase: 'generating',
-      message: '模型服务不支持逐字显示，正在等完整结果（通常 1–2 分钟）',
+      message: tr('gen.streamFallback'),
       thinking: undefined,
     })
     pushTrace(
       appId,
       'warn',
-      '这个环境不能逐字显示（模型服务没有开放跨域流式），正在等待完整结果，可能要几十秒到两分钟',
+      tr('gen.streamFallbackTrace'),
     )
     return chat(messages, { settings, model: settings.model, signal: controller.signal })
   } finally {
@@ -1033,7 +1046,7 @@ async function checkAndRepair(
     patchJob(app.id, {
       phase: round === 0 ? 'checking' : 'repairing',
       progress: round === 0 ? 58 : 66 + round * 8,
-      message: round === 0 ? '正在检查应用' : `第 ${round} 轮修复`,
+      message: round === 0 ? tr('gen.checking') : tr('gen.repairRound', { round }),
       repairRound: round,
     })
 
@@ -1071,7 +1084,7 @@ async function checkAndRepair(
     patchJob(app.id, {
       phase: 'repairing',
       progress: 66 + round * 8,
-      message: `正在修复：${blocking[0].message}`,
+      message: tr('gen.repairing', { issue: blocking[0].message }),
       repairRound: round + 1,
     })
 
@@ -1106,7 +1119,7 @@ export async function startGeneration(appId: string): Promise<void> {
     appId,
     phase: 'preparing',
     progress: 4,
-    message: '正在整理需求',
+    message: tr('gen.preparingReq'),
     repairRound: 0,
     startedAt: now(),
     cancelled: false,
@@ -1120,16 +1133,16 @@ export async function startGeneration(appId: string): Promise<void> {
     const settings = await readLlmSettings()
     const messages = buildGenerateMessages(app)
 
-    pushTrace(appId, 'think', `先理解一下：${app.requirements.brief}`)
+    pushTrace(appId, 'think', tr('gen.understandBrief', { brief: app.requirements.brief }))
 
     // 第一步：让模型制定开发计划（先规划再动手，步骤会显示给用户）
     setSteps(appId, [
-      { id: 'understand', title: '理解需求' },
-      { id: 'plan', title: '制定开发计划', detail: '拆解步骤，检查有没有要问你的' },
+      { id: 'understand', title: tr('gen.step.understand') },
+      { id: 'plan', title: tr('gen.step.plan'), detail: tr('gen.step.planDetail') },
     ])
     completeStep(appId, 'understand')
     activateStep(appId, 'plan')
-    patchJob(appId, { phase: 'planning', progress: 10, message: '正在制定开发计划' })
+    patchJob(appId, { phase: 'planning', progress: 10, message: tr('gen.planning') })
 
     let plan: PlanPayload | null = null
     try {
@@ -1150,14 +1163,14 @@ export async function startGeneration(appId: string): Promise<void> {
       patchJob(appId, {
         phase: 'asking',
         progress: 16,
-        message: '有几个关键点需要你确认',
+        message: tr('gen.asking'),
         questions: plan.questions,
       })
       answers = await new Promise<Record<string, string>>((resolve, reject) => {
         askWaiters.set(appId, { resolve, reject })
       })
       ensureNotCancelled(appId)
-      patchJob(appId, { phase: 'generating', questions: undefined, message: '已确认，继续生成' })
+      patchJob(appId, { phase: 'generating', questions: undefined, message: tr('gen.confirmed') })
       const clarifications = plan.questions.map((question) => ({
         question: question.question,
         answer: answers[question.id] ?? '（按默认）',
@@ -1184,17 +1197,17 @@ export async function startGeneration(appId: string): Promise<void> {
     }
 
     // 第三步：按计划分步执行；每步一次轻量思考，最后一步写出完整应用
-    const planSteps = plan?.steps ?? [{ title: '写出应用', detail: '模型输出完整的单文件应用' }]
+    const planSteps = plan?.steps ?? [{ title: tr('gen.step.write'), detail: tr('gen.step.writeDetail') }]
     setSteps(appId, [
-      { id: 'understand', title: '理解需求' },
-      { id: 'plan', title: '制定开发计划', detail: planSteps.map((item) => item.title).join(' → ') },
+      { id: 'understand', title: tr('gen.step.understand') },
+      { id: 'plan', title: tr('gen.step.plan'), detail: planSteps.map((item) => item.title).join(' → ') },
       ...planSteps.map((step, index) => ({
         id: `s${index}`,
         title: step.title,
         detail: step.detail,
       })),
-      { id: 'check', title: '检查与修复', detail: '静态检查 + 离屏运行' },
-      { id: 'save', title: '保存应用' },
+      { id: 'check', title: tr('gen.step.check'), detail: tr('gen.step.checkDetail') },
+      { id: 'save', title: tr('gen.step.save') },
     ])
     completeStep(appId, 'understand')
     completeStep(appId, 'plan')
@@ -1220,10 +1233,14 @@ export async function startGeneration(appId: string): Promise<void> {
     }
 
     const lastStepId = `s${planSteps.length - 1}`
-    patchJob(appId, { phase: 'generating', progress: 34, message: `正在${planSteps[planSteps.length - 1].title}` })
+    patchJob(appId, {
+      phase: 'generating',
+      progress: 34,
+      message: tr('gen.doingStep', { step: planSteps[planSteps.length - 1].title }),
+    })
     ensureNotCancelled(appId)
 
-    pushTrace(appId, 'act', '模型正在写代码')
+    pushTrace(appId, 'act', tr('gen.writingCode'))
     const result = await runStreamingChat(appId, messages, settings)
     await recordUsage(app, 'generate', result.model, result.inputTokens, result.outputTokens)
     ensureNotCancelled(appId)
@@ -1233,18 +1250,21 @@ export async function startGeneration(appId: string): Promise<void> {
     pushTrace(
       appId,
       'ok',
-      `写完了：约 ${Math.round(parsed.html.length / 1024)} KB、${parsed.html.split('\n').length} 行`,
+      tr('gen.writtenSize', {
+        kb: Math.round(parsed.html.length / 1024),
+        lines: parsed.html.split('\n').length,
+      }),
     )
     for (const note of parsed.notes) pushTrace(appId, 'think', note)
 
     activateStep(appId, 'check')
-    patchJob(appId, { phase: 'checking', progress: 52, message: '正在检查应用' })
+    patchJob(appId, { phase: 'checking', progress: 52, message: tr('gen.checking') })
     const checked = await checkAndRepair(app, parsed, settings)
     ensureNotCancelled(appId)
 
     activateStep(appId, 'save')
-    pushTrace(appId, 'act', '保存应用与权限卡')
-    patchJob(appId, { phase: 'saving', progress: 94, message: '正在保存' })
+    pushTrace(appId, 'act', tr('gen.savedApp'))
+    patchJob(appId, { phase: 'saving', progress: 94, message: tr('gen.saving') })
     completeStep(appId, 'save')
     const latest = (await getApp(appId)) ?? app
     const manifest = buildManifest(latest, checked.payload, settings.model, checked.turns)
@@ -1266,22 +1286,26 @@ export async function startGeneration(appId: string): Promise<void> {
       updatedAt: now(),
     }
     await saveApp(saved)
-    pushTrace(appId, 'ok', '做好了，可以试用')
+    pushTrace(appId, 'ok', tr('gen.madeIt'))
     patchJob(appId, {
       phase: 'done',
       progress: 100,
-      message: checked.warnings.length > 0 ? '已生成，有少量提醒' : '已生成',
+      message: checked.warnings.length > 0 ? tr('gen.generatedWarn') : tr('gen.generated'),
       finishedAt: now(),
     })
   } catch (error) {
     const cancelled = error instanceof CancelledError || jobs.get(appId)?.cancelled
-    pushTrace(appId, 'error', cancelled ? '已取消这次生成' : `没做成：${(error as Error).message}`)
+    pushTrace(
+      appId,
+      'error',
+      cancelled ? tr('gen.cancelledGen') : tr('gen.notMade', { message: (error as Error).message }),
+    )
     const activeStep = jobs.get(appId)?.steps.find((step) => step.status === 'active')
     if (activeStep) completeStep(appId, activeStep.id, cancelled ? 'warn' : 'error')
     patchJob(appId, {
       phase: cancelled ? 'cancelled' : 'failed',
       progress: 100,
-      message: cancelled ? '已取消' : '生成失败',
+      message: cancelled ? tr('gen.cancelled') : tr('gen.genFailed'),
       error: cancelled ? undefined : (error as Error).message,
       finishedAt: now(),
     })
@@ -1305,7 +1329,7 @@ export async function reviseApp(
     appId,
     phase: 'generating',
     progress: 20,
-    message: '正在修改',
+    message: tr('gen.revisePrep'),
     repairRound: 0,
     startedAt: now(),
     cancelled: false,
@@ -1317,15 +1341,15 @@ export async function reviseApp(
   const stopHeartbeat = startHeartbeat(appId)
   try {
     setSteps(appId, [
-      { id: 'read', title: '理解修改意见' },
-      { id: 'write', title: '改代码', detail: '模型按意见更新应用' },
-      { id: 'check', title: '检查与修复', detail: '静态检查 + 离屏运行' },
-      { id: 'save', title: '保存修改' },
+      { id: 'read', title: tr('gen.step.read') },
+      { id: 'write', title: tr('gen.step.reviseWrite'), detail: tr('gen.step.reviseWriteDetail') },
+      { id: 'check', title: tr('gen.step.check'), detail: tr('gen.step.checkDetail') },
+      { id: 'save', title: tr('gen.step.saveRevise') },
     ])
-    pushTrace(appId, 'think', `收到修改意见：${request.trim()}`)
+    pushTrace(appId, 'think', tr('gen.gotRequest', { request: request.trim() }))
     const settings = await readLlmSettings()
     activateStep(appId, 'write')
-    pushTrace(appId, 'act', '模型正在按意见改代码')
+    pushTrace(appId, 'act', tr('gen.editingCode'))
     const result = await runStreamingChat(
       appId,
       buildReviseMessages(app, request.trim(), attachments),
@@ -1336,9 +1360,9 @@ export async function reviseApp(
 
     let parsed = parseGeneratedPayload(result.content)
     const summary = parsed.description
-    pushTrace(appId, 'ok', `改完了：约 ${Math.round(parsed.html.length / 1024)} KB`)
+    pushTrace(appId, 'ok', tr('gen.edited', { kb: Math.round(parsed.html.length / 1024) }))
     activateStep(appId, 'check')
-    patchJob(appId, { phase: 'checking', progress: 55, message: '正在检查修改结果' })
+    patchJob(appId, { phase: 'checking', progress: 55, message: tr('gen.checkingChanges') })
     const checked = await checkAndRepair(app, parsed, settings)
     parsed = checked.payload
     ensureNotCancelled(appId)
@@ -1378,22 +1402,26 @@ export async function reviseApp(
       detail: `按反馈修改：${request.trim().slice(0, 80)}`,
       at: now(),
     })
-    pushTrace(appId, 'ok', '修改完成，请再看一眼')
+    pushTrace(appId, 'ok', tr('gen.reviseDone'))
     patchJob(appId, {
       phase: 'done',
       progress: 100,
-      message: '已更新，请再看一眼',
+      message: tr('gen.updated'),
       finishedAt: now(),
     })
   } catch (error) {
     const cancelled = error instanceof CancelledError || jobs.get(appId)?.cancelled
-    pushTrace(appId, 'error', cancelled ? '已取消这次修改' : `没改成：${(error as Error).message}`)
+    pushTrace(
+      appId,
+      'error',
+      cancelled ? tr('gen.reviseCancelled') : tr('gen.notEdited', { message: (error as Error).message }),
+    )
     const activeStep = jobs.get(appId)?.steps.find((step) => step.status === 'active')
     if (activeStep) completeStep(appId, activeStep.id, cancelled ? 'warn' : 'error')
     patchJob(appId, {
       phase: cancelled ? 'cancelled' : 'failed',
       progress: 100,
-      message: cancelled ? '已取消' : '修改失败',
+      message: cancelled ? tr('gen.cancelled') : tr('gen.reviseFailed'),
       error: cancelled ? undefined : (error as Error).message,
       finishedAt: now(),
     })

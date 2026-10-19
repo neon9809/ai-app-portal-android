@@ -5,6 +5,8 @@ import { ChevronLeft, MoreHorizontal } from 'lucide-react'
 import { SandboxFrame } from '@/app/components/SandboxFrame'
 import { getApp, saveApp } from '@/shared/portal/db'
 import { invokeNative } from '@/shared/bridge'
+import { getThemePreference, resolveTheme } from '@/shared/theme'
+import { useI18n } from '@/shared/i18n'
 import type { PortalApp } from '@/shared/portal/types'
 import { now } from '@/shared/portal/utils'
 import { EmptyState, Spinner } from '@/shared/ui/Feedback'
@@ -20,6 +22,7 @@ export function RunnerPage() {
   const navigate = useNavigate()
   const [app, setApp] = useState<PortalApp | null | undefined>(undefined)
   const openedRef = useRef(false)
+  const { t } = useI18n()
 
   useEffect(() => {
     let alive = true
@@ -42,14 +45,16 @@ export function RunnerPage() {
   }, [id])
 
   useEffect(() => {
-    // 浅色工具条：状态栏用深色前景（图标 / 时间）
-    void invokeNative('setStatusBarStyle', { light: false }).catch(() => undefined)
+    // 状态栏图标跟随当前主题：深色底用浅色图标
+    void invokeNative('setStatusBarStyle', {
+      light: resolveTheme(getThemePreference()) === 'dark',
+    }).catch(() => undefined)
   }, [])
 
   if (app === undefined) {
     return (
       <div className="page-enter flex h-screen-dvh items-center justify-center bg-background">
-        <Spinner label="正在打开工具" />
+        <Spinner label={t('runner.opening')} />
       </div>
     )
   }
@@ -59,9 +64,9 @@ export function RunnerPage() {
       <div className="page-enter flex h-screen-dvh flex-col bg-background">
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
-            title="找不到这个应用"
-            description="它可能已经被删除了。"
-            action={<Button onClick={() => navigate('/')}>回到我的工具</Button>}
+            title={t('runner.notFound')}
+            description={t('runner.notFoundDesc')}
+            action={<Button onClick={() => navigate('/')}>{t('runner.backHome')}</Button>}
           />
         </div>
       </div>
@@ -75,7 +80,7 @@ export function RunnerPage() {
           <button
             type="button"
             onClick={() => navigate('/')}
-            aria-label="返回我的工具"
+            aria-label={t('runner.backLabel')}
             className="flex size-11 items-center justify-center rounded-md active:bg-accent"
           >
             <ChevronLeft className="size-6" aria-hidden />
@@ -92,7 +97,7 @@ export function RunnerPage() {
           <button
             type="button"
             onClick={() => navigate(`/app/${app.id}/detail`)}
-            aria-label="应用详情"
+            aria-label={t('runner.details')}
             className="flex size-11 items-center justify-center rounded-md active:bg-accent"
           >
             <MoreHorizontal className="size-5" aria-hidden />

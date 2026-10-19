@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import { usePageTitle } from '@/app/layout/PageTitle'
+import { resolveLocale, translate, useI18n } from '@/shared/i18n'
 import { cn } from '@/shared/lib/cn'
 import { getApp, listApps, saveApp } from '@/shared/portal/db'
 import { takeSnapshot } from '@/shared/portal/backup'
@@ -62,12 +63,7 @@ const MAX_IMAGE_BYTES = 800_000
 const MAX_TEXT_BYTES = 50_000
 
 /** 一键填入的起步示例：和首次引导里的例子保持一致 */
-const EXAMPLE_BRIEFS = [
-  '记每天喝了几杯水',
-  '做个没有广告的番茄钟',
-  '帮我做一个跳一跳小游戏',
-  '帮我做一个可以弹奏的钢琴APP',
-]
+const EXAMPLE_KEYS = ['studio.ex1', 'studio.ex2', 'studio.ex3', 'studio.ex4'] as const
 
 function bytesToDataUrl(bytes: Uint8Array, name: string): Promise<string> {
   const mime = /\.png$/i.test(name)
@@ -81,7 +77,7 @@ function bytesToDataUrl(bytes: Uint8Array, name: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result ?? ''))
-    reader.onerror = () => reject(reader.error ?? new Error('读取附件失败'))
+    reader.onerror = () => reject(reader.error ?? new Error(translate(resolveLocale(), 'studio.attachReadFail')))
     reader.readAsDataURL(blob)
   })
 }
@@ -115,7 +111,8 @@ export function StudioPage() {
   const composerDockRef = useRef<HTMLDivElement>(null)
   const [composerHeight, setComposerHeight] = useState(0)
   const hasHtml = Boolean(app?.html)
-  usePageTitle(hasHtml ? '继续开发' : '新建工具')
+  const { t } = useI18n()
+  usePageTitle(hasHtml ? t('studio.titleContinue') : t('studio.titleNew'))
 
   /*
    * 只有带 ?app=<id> 时才是「继续开发」某个应用；
@@ -175,8 +172,8 @@ export function StudioPage() {
       const latest = await getApp(app.id)
       if (latest) setApp(latest)
       if (job.phase === 'done') {
-        toast({ title: '做好了，已经放进我的应用', tone: 'success' })
-        await takeSnapshot('生成应用')
+        toast({ title: t('studio.doneToast'), tone: 'success' })
+        await takeSnapshot(t('studio.snapshotGen'))
       }
     })()
   }, [job?.phase, job?.startedAt, app?.id, toast])
@@ -244,18 +241,18 @@ export function StudioPage() {
       const isImage = /\.(png|jpe?g|webp|gif|bmp)$/i.test(picked.name)
       if (isImage) {
         if (picked.bytes.byteLength > MAX_IMAGE_BYTES) {
-          toast({ title: '图片太大', description: '请选 800KB 以内的图片', tone: 'warning' })
+          toast({ title: t('studio.imageTooLarge'), description: t('studio.imageTooLargeDesc'), tone: 'warning' })
           return
         }
         if (attachments.filter((item) => item.kind === 'image').length >= MAX_IMAGES) {
-          toast({ title: `最多附 ${MAX_IMAGES} 张图片`, tone: 'warning' })
+          toast({ title: t('studio.maxImages', { count: MAX_IMAGES }), tone: 'warning' })
           return
         }
         const content = await bytesToDataUrl(picked.bytes, picked.name)
         setAttachments((current) => [...current, { name: picked.name, kind: 'image', content }])
       } else {
         if (picked.bytes.byteLength > MAX_TEXT_BYTES) {
-          toast({ title: '文件太大', description: '文本附件请控制在 50KB 以内', tone: 'warning' })
+          toast({ title: t('studio.fileTooLarge'), description: t('studio.fileTooLargeDesc'), tone: 'warning' })
           return
         }
         const content = new TextDecoder().decode(picked.bytes).slice(0, 20_000)
@@ -265,7 +262,7 @@ export function StudioPage() {
         ])
       }
     } catch (cause) {
-      toast({ title: '添加附件失败', description: (cause as Error).message, tone: 'danger' })
+      toast({ title: t('studio.attachFail'), description: (cause as Error).message, tone: 'danger' })
     }
   }
 
@@ -273,8 +270,8 @@ export function StudioPage() {
     const settings = await readLlmSettings()
     if (isLlmConfigured(settings)) return true
     toast({
-      title: '先配置模型',
-      description: '生成需要连接一个模型服务',
+      title: t('studio.needModel'),
+      description: t('studio.needModelDesc'),
       tone: 'warning',
     })
     navigate('/settings/model')
@@ -284,7 +281,7 @@ export function StudioPage() {
   const submitNew = async () => {
     const text = brief.trim()
     if (text.length < 4) {
-      toast({ title: '再多说一点', description: '用一句话描述你想做的工具', tone: 'warning' })
+      toast({ title: t('studio.moreDetail'), description: t('studio.moreDetailDesc'), tone: 'warning' })
       return
     }
     if (!(await ensureModel())) return
@@ -298,13 +295,13 @@ export function StudioPage() {
       const timestamp = now()
       const draft: PortalApp = {
         id,
-        name: '未命名工具',
+        name: t('studio.untitled'),
         emoji: '🧩',
-        description: '正在生成',
+        description: t('studio.generating'),
         html: '',
         manifest: {
           id,
-          name: '未命名工具',
+          name: t('studio.untitled'),
           version: '1.0.0',
           entry: 'app/index.html',
           capabilities: plan.capabilities,
@@ -327,7 +324,7 @@ export function StudioPage() {
       setAttachments([])
     } catch (cause) {
       const message = (cause as Error).message
-      if (message && message !== '已取消') setError(message)
+      if (message && message !== t('studio.cancelledMsg')) setError(message)
     } finally {
       setBusy(false)
     }
@@ -335,7 +332,7 @@ export function StudioPage() {
 
   const submitRevision = async () => {
     if (!app || !feedback.trim()) {
-      toast({ title: '说说想改哪里', tone: 'warning' })
+      toast({ title: t('studio.sayWhatToChange'), tone: 'warning' })
       return
     }
     if (!(await ensureModel())) return
@@ -349,7 +346,7 @@ export function StudioPage() {
       if (latest) setApp(latest)
     } catch (cause) {
       const message = (cause as Error).message
-      if (message && message !== '已取消') setError(message)
+      if (message && message !== t('studio.cancelledMsg')) setError(message)
     } finally {
       setBusy(false)
     }
@@ -368,9 +365,9 @@ export function StudioPage() {
       await rollbackRevision(app.id, index)
       const latest = await getApp(app.id)
       if (latest) setApp(latest)
-      toast({ title: '已回到这一版', tone: 'success' })
+      toast({ title: t('studio.rolledBack'), tone: 'success' })
     } catch (cause) {
-      toast({ title: '回溯失败', description: (cause as Error).message, tone: 'danger' })
+      toast({ title: t('studio.rollbackFail'), description: (cause as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -387,12 +384,14 @@ export function StudioPage() {
       setDeleteTarget(null)
       toast({
         title:
-          removedCount > 1 ? `已删除这一版及之后 ${removedCount - 1} 条记录` : '已删除这一版',
-        description: '工具已回退到这一版之前',
+          removedCount > 1
+            ? t('studio.deletedMany', { count: removedCount - 1 })
+            : t('studio.deletedOne'),
+        description: t('studio.deletedDesc'),
         tone: 'success',
       })
     } catch (cause) {
-      toast({ title: '删除失败', description: (cause as Error).message, tone: 'danger' })
+      toast({ title: t('studio.deleteFail'), description: (cause as Error).message, tone: 'danger' })
     } finally {
       setDeleting(false)
     }
@@ -407,7 +406,7 @@ export function StudioPage() {
   if (loading) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
-        <Spinner label="正在准备" />
+        <Spinner label={t('studio.preparing')} />
       </div>
     )
   }
@@ -418,15 +417,15 @@ export function StudioPage() {
         <div className="mb-3 flex items-start gap-2 rounded-md border border-danger/30 bg-danger/5 p-3">
           <CircleSlash className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden />
           <div className="min-w-0 flex-1">
-            <p className="text-body font-medium text-danger">这一步没走通</p>
+            <p className="text-body font-medium text-danger">{t('studio.failedTitle')}</p>
             <p className="mt-0.5 break-words text-caption text-muted-foreground">{error}</p>
             <div className="mt-2 flex gap-2">
               <Button size="sm" variant="outline" onClick={retry}>
                 <RefreshCw className="size-3.5" aria-hidden />
-                重试
+                {t('studio.retry')}
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setError(null)}>
-                先不管
+                {t('studio.ignore')}
               </Button>
             </div>
           </div>
@@ -438,9 +437,9 @@ export function StudioPage() {
         <>
           {app && (
             <div className="mb-3 rounded-lg border border-border bg-muted p-3">
-              <p className="text-body font-medium">上一次生成没有完成</p>
+              <p className="text-body font-medium">{t('studio.lastUnfinished')}</p>
               <p className="mt-0.5 text-caption text-muted-foreground">
-                可能是在切到后台时被系统暂停了。需求和附件还在，可以从头再生成一次。
+                {t('studio.lastUnfinishedDesc')}
               </p>
               <Button
                 size="sm"
@@ -449,20 +448,20 @@ export function StudioPage() {
                 onClick={() => void submitNew()}
                 disabled={busy}
               >
-                继续生成
+                {t('studio.resume')}
               </Button>
             </div>
           )}
 
           <header className="flex flex-col items-center pb-4 pt-6 text-center">
             <DotMark size="xl" className="mb-3" />
-            <h1 className="text-display font-semibold">想做点什么？</h1>
+            <h1 className="text-display font-semibold">{t('studio.askTitle')}</h1>
           </header>
 
           <Composer
             value={brief}
             onChange={setBrief}
-            placeholder="例如：一个记录每天喝水杯数的小工具，能看这周喝了几杯"
+            placeholder={t('studio.placeholderNew')}
             rows={5}
             attachments={attachments}
             onAddAttachment={() => void addAttachment()}
@@ -470,22 +469,22 @@ export function StudioPage() {
               setAttachments((current) => current.filter((_, position) => position !== index))
             }
             onSubmit={submit}
-            submitLabel="开始"
+            submitLabel={t('studio.start')}
             loading={busy}
           />
 
 
           <div className="mt-4">
-            <p className="text-center text-caption text-muted-foreground">试试</p>
+            <p className="text-center text-caption text-muted-foreground">{t('studio.tryThese')}</p>
             <div className="mt-2 flex flex-wrap justify-center gap-2">
-              {EXAMPLE_BRIEFS.map((example) => (
+              {EXAMPLE_KEYS.map((key) => (
                 <button
-                  key={example}
+                  key={key}
                   type="button"
-                  onClick={() => setBrief(example)}
+                  onClick={() => setBrief(t(key))}
                   className="min-h-tap rounded-full border border-border bg-surface px-3.5 text-caption text-foreground shadow-sm transition-colors duration-fast ease-standard active:bg-accent"
                 >
-                  {example}
+                  {t(key)}
                 </button>
               ))}
             </div>
@@ -511,7 +510,7 @@ export function StudioPage() {
                 </p>
               </div>
               <Button onClick={() => navigate(`/app/${app.id}`)}>
-                打开
+                {t('studio.open')}
                 <ArrowUpRight className="size-4" aria-hidden />
               </Button>
             </section>
@@ -522,7 +521,7 @@ export function StudioPage() {
 
             {!generating && app && (
               <AssistantTurn
-                title={`已生成「${app.name}」`}
+                title={t('studio.generated', { name: app.name })}
                 meta={formatDateTime(app.createdAt)}
                 steps={app.generationSteps}
                 onOpen={
@@ -535,7 +534,7 @@ export function StudioPage() {
               <div key={`${revision.at}-${index}`} className="space-y-3">
                 <ChatBubble role="user" text={revision.request} />
                 <AssistantTurn
-                  title="已按你的意见更新"
+                  title={t('studio.updated')}
                   meta={formatDateTime(revision.at)}
                   steps={revision.steps}
                   onRollback={generating ? undefined : () => void rollback(index)}
@@ -551,7 +550,7 @@ export function StudioPage() {
 
             {generating && (
               <AssistantTurn
-                title={job?.message ?? '正在准备'}
+                title={job?.message ?? t('studio.preparing')}
                 running
                 elapsed={elapsed}
                 progress={job?.progress ?? 0}
@@ -574,12 +573,12 @@ export function StudioPage() {
             {generating && (
               <p className="text-center text-caption text-muted-foreground">
                 {job?.phase === 'asking'
-                  ? '在等你确认上面这几个关键点。'
+                  ? t('studio.waitingConfirm')
                   : job && ['checking', 'repairing', 'saving'].includes(job.phase)
-                    ? '代码写完了，正在做最后的检查与保存。'
+                    ? t('studio.checkingPhase')
                     : !job?.live && !job?.thinking
-                    ? `模型还没开始输出，已等待 ${elapsed} 秒…`
-                    : '生成时请保持门户在前台。'}
+                    ? t('studio.waitingFirst', { seconds: elapsed })
+                    : t('studio.keepForeground')}
               </p>
             )}
 
@@ -596,7 +595,7 @@ export function StudioPage() {
                 <Composer
                   value={feedback}
                   onChange={setFeedback}
-                  placeholder="继续说想改什么，比如「标题小一点」「加一个导出按钮」"
+                  placeholder={t('studio.placeholderRevise')}
                   rows={2}
                   attachments={attachments}
                   onAddAttachment={() => void addAttachment()}
@@ -606,7 +605,7 @@ export function StudioPage() {
                     )
                   }
                   onSubmit={submit}
-                  submitLabel="继续修改"
+                  submitLabel={t('studio.revise')}
                   loading={busy}
                 />
               </div>
@@ -620,15 +619,15 @@ export function StudioPage() {
         onClose={() => {
           if (!deleting) setDeleteTarget(null)
         }}
-        title="删除这一版？"
-        description="工具会回退到这一版之前的状态；这一版之后、依赖它的修改记录也会一起删除。此操作不可撤销。"
+        title={t('studio.deleteTitle')}
+        description={t('studio.deleteDesc')}
         footer={
           <>
             <Button variant="ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" loading={deleting} onClick={() => void removeRevision()}>
-              删除并回退
+              {t('studio.deleteConfirm')}
             </Button>
           </>
         }
@@ -670,6 +669,7 @@ function Composer({
   submitLabel: string
   loading: boolean
 }) {
+  const { t } = useI18n()
   return (
     <section className="rounded-xl border border-border bg-surface p-2 shadow-sm transition-colors duration-fast focus-within:border-primary/40">
       <textarea
@@ -690,7 +690,7 @@ function Composer({
               <span className="max-w-[140px] truncate">{item.name}</span>
               <button
                 type="button"
-                aria-label={`移除 ${item.name}`}
+                aria-label={t('studio.removeAttach', { name: item.name })}
                 onClick={() => onRemoveAttachment(index)}
                 className="flex size-8 items-center justify-center rounded-full text-muted-foreground active:bg-accent"
               >
@@ -708,7 +708,7 @@ function Composer({
           className="flex min-h-tap items-center gap-1.5 rounded-md px-2 text-caption text-muted-foreground active:bg-accent"
         >
           <Paperclip className="size-4" aria-hidden />
-          附件
+          {t('studio.attach')}
         </button>
         <Button variant="spark" loading={loading} onClick={onSubmit}>
           <Sparkles className="size-4" aria-hidden />
@@ -753,6 +753,7 @@ function AssistantTurn({
   onCancel?: () => void
   onRollback?: () => void
 }) {
+  const { t } = useI18n()
   // 默认展开：让用户一眼看到这一步做了哪些事
   const [open, setOpen] = useState(true)
 
@@ -781,7 +782,7 @@ function AssistantTurn({
         {running && typeof progress === 'number' && (
           <div className="mt-3">
             <div className="flex items-baseline justify-between text-caption text-muted-foreground">
-              <span>生成进度</span>
+              <span>{t('studio.progress')}</span>
               <span className="tabular-nums text-foreground">
                 {Math.max(0, Math.min(100, Math.round(progress)))}%
               </span>
@@ -812,8 +813,12 @@ function AssistantTurn({
             >
               <span>
                 {running
-                  ? `进行中${typeof elapsed === 'number' && elapsed > 0 ? ` · 已用 ${elapsed} 秒` : ''}`
-                  : '过程'}
+                  ? `${t('studio.inProgress')}${
+                      typeof elapsed === 'number' && elapsed > 0
+                        ? ` · ${t('studio.elapsed', { seconds: elapsed })}`
+                        : ''
+                    }`
+                  : t('studio.process')}
               </span>
               <ChevronDown
                 className={cn('size-3.5 transition-transform duration-200', open && 'rotate-180')}
@@ -836,7 +841,7 @@ function AssistantTurn({
 
         {onOpen && (
           <Button block className="mt-3" onClick={onOpen}>
-            打开工具
+            {t('common.openTool')}
             <ArrowUpRight className="size-4" aria-hidden />
           </Button>
         )}
@@ -845,7 +850,7 @@ function AssistantTurn({
           <div className="mt-2 flex justify-end border-t border-border pt-2">
             <Button variant="ghost" size="sm" onClick={onCancel}>
               <X className="size-3.5" aria-hidden />
-              停止生成
+              {t('studio.stop')}
             </Button>
           </div>
         )}
@@ -859,7 +864,7 @@ function AssistantTurn({
                 className="flex min-h-tap items-center gap-1.5 text-left text-caption text-muted-foreground active:opacity-70"
               >
                 <RotateCcw className="size-3.5" aria-hidden />
-                回到这一版
+                {t('studio.backToVersion')}
               </button>
             ) : (
               <span />
@@ -871,7 +876,7 @@ function AssistantTurn({
                 className="flex min-h-tap items-center gap-1.5 text-caption text-danger active:opacity-70"
               >
                 <Trash2 className="size-3.5" aria-hidden />
-                删除这一版
+                {t('studio.deleteVersion')}
               </button>
             )}
           </div>
@@ -889,6 +894,7 @@ function AskCard({
   questions: ClarifyQuestion[]
   onSubmit: (answers: Record<string, string>) => void
 }) {
+  const { t } = useI18n()
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const answeredAll = questions.every((question) => (answers[question.id] ?? '').trim().length > 0)
 
@@ -896,10 +902,10 @@ function AskCard({
     <section className="onboarding-rise rounded-xl border border-spark/40 bg-spark-soft/60 p-4">
       <header className="flex items-center gap-2">
         <CircleHelp className="size-4 text-spark" aria-hidden />
-        <p className="text-body font-medium">有几个关键点需要你定</p>
+        <p className="text-body font-medium">{t('studio.askCardTitle')}</p>
       </header>
       <p className="mt-0.5 text-caption text-muted-foreground">
-        都能自己猜的就直接做了，这几个答案会明显改变做法。
+        {t('studio.askCardHint')}
       </p>
 
       <ol className="mt-3 space-y-3">
@@ -927,7 +933,7 @@ function AskCard({
                 onChange={(event) =>
                   setAnswers((current) => ({ ...current, [question.id]: event.target.value }))
                 }
-                placeholder="或自己写"
+                placeholder={t('studio.askCustom')}
                 maxLength={60}
                 className="min-h-tap min-w-[7rem] flex-1 rounded-full border border-input bg-surface px-3.5 text-caption outline-none focus:border-primary"
               />
@@ -943,7 +949,7 @@ function AskCard({
         disabled={!answeredAll}
         onClick={() => onSubmit(answers)}
       >
-        继续
+        {t('studio.askContinue')}
       </Button>
     </section>
   )
@@ -1019,6 +1025,7 @@ function StepList({
   liveRef?: RefObject<HTMLPreElement | null>
   thinkingRef?: RefObject<HTMLPreElement | null>
 }) {
+  const { t } = useI18n()
   const [expanded, setExpanded] = useState<string[]>([])
   const activeId = steps.find((step) => step.status === 'active')?.id
 
@@ -1035,7 +1042,7 @@ function StepList({
   }
 
   if (steps.length === 0) {
-    return <p className="text-caption text-muted-foreground">正在规划要做的步骤…</p>
+    return <p className="text-caption text-muted-foreground">{t('studio.planningSteps')}</p>
   }
 
   return (
@@ -1079,7 +1086,7 @@ function StepList({
               </span>
               {step.status !== 'pending' && (
                 <span className="shrink-0 text-caption tabular-nums text-muted-foreground">
-                  {step.logs.length > 0 ? `${step.logs.length} 条` : ''}
+                  {step.logs.length > 0 ? t('studio.logCount', { count: step.logs.length }) : ''}
                   {step.logs.length > 0 && seconds > 0 ? ' · ' : ''}
                   {seconds > 0 ? `${seconds}s` : ''}
                 </span>
@@ -1130,34 +1137,34 @@ function StepList({
                   </div>
                 ))}
                 {step.status === 'active' && thinking && (
-                  <div className="mt-2 overflow-hidden rounded-lg bg-foreground">
-                    <div className="flex items-center gap-2 border-b border-background/10 px-2.5 py-1.5">
+                  <div className="mt-2 overflow-hidden rounded-lg bg-console">
+                    <div className="flex items-center gap-2 border-b border-console-foreground/10 px-2.5 py-1.5">
                       <span
                         className="dot-pulse-core size-1.5 rounded-full bg-spark-bright"
                         aria-hidden
                       />
-                      <span className="text-caption font-medium text-background/85">模型思考 · 实时</span>
+                      <span className="text-caption font-medium text-console-foreground/85">{t('studio.thinkingLive')}</span>
                     </div>
                     <pre
                       ref={thinkingRef}
-                      className="max-h-[30dvh] overflow-y-auto whitespace-pre-wrap break-words p-2.5 text-caption leading-relaxed text-background/65"
+                      className="max-h-[30dvh] overflow-y-auto whitespace-pre-wrap break-words p-2.5 text-caption leading-relaxed text-console-foreground/65"
                     >
                       {thinking}
                     </pre>
                   </div>
                 )}
                 {step.status === 'active' && live && (
-                  <div className="mt-2 overflow-hidden rounded-lg bg-foreground">
-                    <div className="flex items-center gap-2 border-b border-background/10 px-2.5 py-1.5">
+                  <div className="mt-2 overflow-hidden rounded-lg bg-console">
+                    <div className="flex items-center gap-2 border-b border-console-foreground/10 px-2.5 py-1.5">
                       <span
                         className="dot-pulse-core size-1.5 rounded-full bg-spark-bright"
                         aria-hidden
                       />
-                      <span className="text-caption font-medium text-background/85">正在写代码 · 实时</span>
+                      <span className="text-caption font-medium text-console-foreground/85">{t('studio.writingLive')}</span>
                     </div>
                     <pre
                       ref={liveRef}
-                      className="max-h-[40dvh] overflow-y-auto whitespace-pre-wrap break-all p-2.5 font-mono text-caption leading-relaxed text-background/75"
+                      className="max-h-[40dvh] overflow-y-auto whitespace-pre-wrap break-all p-2.5 font-mono text-caption leading-relaxed text-console-foreground/75"
                     >
                       {previewLive(live)}
                     </pre>
@@ -1165,7 +1172,7 @@ function StepList({
                 )}
                 {step.logs.length === 0 && !(step.id === 'write' && (live || thinking)) && (
                   <p className="py-1 text-caption text-muted-foreground">
-                    {step.status === 'pending' ? '等待中' : '这一步还没有输出'}
+                    {step.status === 'pending' ? t('studio.waitingStep') : t('studio.noOutput')}
                   </p>
                 )}
               </div>

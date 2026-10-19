@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useI18n } from '@/shared/i18n'
 import { Check, ChevronLeft, Loader2, Sparkles } from 'lucide-react'
 
 import { cn } from '@/shared/lib/cn'
@@ -31,9 +32,9 @@ import { Button } from '@/shared/ui/Button'
 
 const SEEN_KEY = 'onboardingSeenV2'
 
-const EXAMPLES = ['帮我做一个可以弹奏的钢琴APP', '做个没有广告的番茄钟']
+const EXAMPLE_KEYS = ['guide.exPiano', 'guide.exPomodoro'] as const
 
-const BUILD_STEPS = ['读懂你要什么', '画出界面', '写好逻辑和存储', '在本机自检'] as const
+const BUILD_STEP_KEYS = ['guide.step1', 'guide.step2', 'guide.step3', 'guide.step4'] as const
 
 /** 口袋里的小钢琴：八个白键，C4–C5 */
 const PIANO_KEYS = [
@@ -51,12 +52,12 @@ type Scene = 'say' | 'build' | 'use'
 
 const SCENE_INDEX: Record<Scene, number> = { say: 0, build: 1, use: 2 }
 
-const SCENE_LABELS = ['一句话', '它来做', '直接用'] as const
+const SCENE_LABEL_KEYS = ['guide.scene1', 'guide.scene2', 'guide.scene3'] as const
 
 const SCENE_ANNOUNCE: Record<Scene, string> = {
-  say: '第 1 步，共 3 步：说一句话',
-  build: '第 2 步，共 3 步：它来做',
-  use: '第 3 步，共 3 步：直接用',
+  say: 'guide.announce1',
+  build: 'guide.announce2',
+  use: 'guide.announce3',
 }
 
 /** 点阵布局：grid 静置 / ring 生成中 / gather 收拢成一个种子 */
@@ -158,6 +159,7 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
   const [scene, setScene] = useState<Scene>('say')
   const [draft, setDraft] = useState('')
   const [built, setBuilt] = useState('')
+  const { t } = useI18n()
   const [wipe, setWipe] = useState<{ x: number; y: number; phase: 'cover' | 'open' } | null>(null)
   const [modelReady, setModelReady] = useState(true)
 
@@ -241,10 +243,10 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
       tabIndex={-1}
       role="dialog"
       aria-modal="true"
-      aria-label="使用说明"
+      aria-label={t('guide.title')}
       onKeyDown={onKeyDown}
       className={cn(
-        'fixed inset-0 z-[60] flex h-screen-dvh flex-col overflow-hidden bg-primary text-primary-foreground outline-none',
+        'fixed inset-0 z-[60] flex h-screen-dvh flex-col overflow-hidden bg-brand text-brand-foreground outline-none',
         closing ? 'onboarding-closing' : 'onboarding-shell',
       )}
     >
@@ -265,12 +267,12 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
       <header className="relative shrink-0 px-4 pt-safe-top">
         <div className="flex min-h-11 items-center justify-between">
           {scene === 'say' ? (
-            <span className="text-caption text-primary-foreground/80">使用说明</span>
+            <span className="text-caption text-primary-foreground/80">{t('guide.title')}</span>
           ) : (
             <button
               type="button"
               onClick={() => setScene('say')}
-              aria-label="返回上一步"
+              aria-label={t('guide.back')}
               className="-ml-2 flex size-11 items-center justify-center rounded-md active:bg-primary-foreground/10"
             >
               <ChevronLeft className="size-6" aria-hidden />
@@ -281,16 +283,16 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
             onClick={onDone}
             className="flex min-h-tap items-center px-1 text-caption text-primary-foreground active:opacity-80"
           >
-            跳过
+            {t('guide.skip')}
           </button>
         </div>
 
-        <ol className="mb-3 mt-1 flex gap-2" aria-label="引导进度">
-          {SCENE_LABELS.map((label, index) => {
+        <ol className="mb-3 mt-1 flex gap-2" aria-label={t('guide.progress')}>
+          {SCENE_LABEL_KEYS.map((labelKey, index) => {
             const current = index === SCENE_INDEX[scene]
             const passed = index < SCENE_INDEX[scene]
             return (
-              <li key={label} className="flex-1" aria-current={current ? 'step' : undefined}>
+              <li key={labelKey} className="flex-1" aria-current={current ? 'step' : undefined}>
                 <span
                   className={cn(
                     'block h-1 rounded-full transition-colors duration-300',
@@ -305,7 +307,7 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
                       : 'text-primary-foreground/80',
                   )}
                 >
-                  {label}
+                  {t(labelKey)}
                 </span>
               </li>
             )
@@ -329,13 +331,13 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
               block
               size="lg"
               onClick={modelReady ? onDone : configureModel}
-              className="bg-primary-foreground text-primary hover:brightness-100"
+              className="bg-primary-foreground text-brand hover:brightness-100"
             >
-              {modelReady ? '开始使用' : '添加大模型API'}
+              {modelReady ? t('guide.startUsing') : t('nav.addModelApi')}
             </Button>
             {!modelReady && (
               <p className="mt-2 text-center text-caption text-primary-foreground/80">
-                生成工具需要一个模型服务，Key 只保存在这台手机上
+                {t('guide.needModelNote')}
               </p>
             )}
           </div>
@@ -370,6 +372,7 @@ function SayScene({
   initialDraft: string
   onStart: (text: string) => void
 }) {
+  const { t } = useI18n()
   const [draft, setDraft] = useState(initialDraft)
   const [pulse, setPulse] = useState(0)
   const [mode, setMode] = useState<DotMode>('grid')
@@ -413,7 +416,7 @@ function SayScene({
   // 延迟一拍再开始：躲开 StrictMode 开发模式的双挂载（第一次挂载会立刻被卸载，定时器随之清掉）
   useEffect(() => {
     if (initialDraft.trim()) return
-    const start = window.setTimeout(() => typeInto(EXAMPLES[0], { autoStart: true }), 240)
+    const start = window.setTimeout(() => typeInto(t(EXAMPLE_KEYS[0]), { autoStart: true }), 240)
     return () => window.clearTimeout(start)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -482,9 +485,9 @@ function SayScene({
     <div className="onboarding-scene flex min-h-full flex-col">
       <div className="flex flex-col items-center pt-2">
         <DotStage mode={mode} active={8} pulse={pulse} />
-        <h2 className="mt-1 text-center text-display font-semibold">用一句话，做个能用的工具</h2>
+        <h2 className="mt-1 text-center text-display font-semibold">{t('guide.sayTitle')}</h2>
         <p className="mt-1.5 text-center text-body text-primary-foreground/80">
-          说清你要什么，界面、逻辑和存储都由它做好。
+          {t('guide.sayHint')}
         </p>
       </div>
 
@@ -512,7 +515,7 @@ function SayScene({
                 inputRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }),
               )
             }}
-            placeholder="例如：一个记录每天喝水杯数的小工具"
+            placeholder={t('guide.placeholder')}
             className="field-plain w-full resize-none bg-transparent px-2 py-2 text-body placeholder:text-muted-foreground"
           />
           <div className="relative flex items-center justify-end px-1 pb-1">
@@ -534,18 +537,18 @@ function SayScene({
         </section>
 
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-          <span className="text-caption text-primary-foreground/80">试试</span>
-          {EXAMPLES.map((example) => (
+          <span className="text-caption text-primary-foreground/80">{t('guide.try')}</span>
+          {EXAMPLE_KEYS.map((exampleKey) => (
             <button
-              key={example}
+              key={exampleKey}
               type="button"
               onClick={() => {
                 tick()
-                typeInto(example)
+                typeInto(t(exampleKey))
               }}
               className="min-h-tap rounded-full border border-primary-foreground/25 bg-primary-foreground/10 px-3.5 text-caption active:bg-primary-foreground/20"
             >
-              {example}
+              {t(exampleKey)}
             </button>
           ))}
         </div>
@@ -643,6 +646,7 @@ function BuildScene({
   onDone: () => void
   onSkip: () => void
 }) {
+  const { t } = useI18n()
   const [mode, setMode] = useState<DotMode>('gather')
   const [spinning, setSpinning] = useState(false)
   const [step, setStep] = useState(0)
@@ -655,7 +659,7 @@ function BuildScene({
     const expand = window.setTimeout(() => setMode('ring'), 40)
     const spin = window.setTimeout(() => setSpinning(true), 640)
     const per = reduced ? 340 : 560
-    const timers = BUILD_STEPS.map((_, index) =>
+    const timers = BUILD_STEP_KEYS.map((_, index) =>
       window.setTimeout(() => setStep(index + 1), per * (index + 1)),
     )
     let leave: number | null = null
@@ -664,7 +668,7 @@ function BuildScene({
         setDone(true)
         leave = window.setTimeout(onDone, reduced ? 350 : 950)
       },
-      per * BUILD_STEPS.length + 320,
+      per * BUILD_STEP_KEYS.length + 320,
     )
     return () => {
       window.clearTimeout(expand)
@@ -696,7 +700,7 @@ function BuildScene({
     <div className="onboarding-scene flex min-h-full flex-col">
       <div className="mt-auto flex flex-col items-center pt-2">
         <DotStage mode={mode} active={active} spinning={spinning} />
-        <p className="mt-1 text-caption text-primary-foreground/80">你刚才说的</p>
+        <p className="mt-1 text-caption text-primary-foreground/80">{t('guide.youSaid')}</p>
         <p className="mt-1 line-clamp-2 px-2 text-center text-body">「{brief}」</p>
       </div>
 
@@ -716,19 +720,19 @@ function BuildScene({
               )}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-title font-semibold">{done ? '做好了' : '正在把它做出来'}</p>
+              <p className="text-title font-semibold">{done ? t('guide.done') : t('guide.building')}</p>
               <p className="text-caption text-muted-foreground">
-                {done ? '马上就能打开用' : '不用等太久，先看看它是怎么做的'}
+                {done ? t('guide.doneHint') : t('guide.buildingHint')}
               </p>
             </div>
-            {done && <span className="shrink-0 text-caption text-success">完成</span>}
+            {done && <span className="shrink-0 text-caption text-success">{t('guide.complete')}</span>}
           </header>
 
           <ol className="mt-4 space-y-2.5">
-            {BUILD_STEPS.map((label, index) => {
+            {BUILD_STEP_KEYS.map((labelKey, index) => {
               const state = index < step ? 'done' : index === step ? 'active' : 'todo'
               return (
-                <li key={label} className="flex items-center gap-2.5">
+                <li key={labelKey} className="flex items-center gap-2.5">
                   <span
                     className={cn(
                       'grid size-5 shrink-0 place-items-center rounded-full',
@@ -752,7 +756,7 @@ function BuildScene({
                       state === 'todo' ? 'text-muted-foreground' : 'text-surface-foreground',
                     )}
                   >
-                    {label}
+                    {t(labelKey)}
                   </span>
                 </li>
               )
@@ -760,9 +764,9 @@ function BuildScene({
           </ol>
 
           <div className="mt-4 flex gap-1" aria-hidden>
-            {BUILD_STEPS.map((label, index) => (
+            {BUILD_STEP_KEYS.map((labelKey, index) => (
               <span
-                key={label}
+                key={labelKey}
                 className={cn(
                   'h-1 flex-1 rounded-full transition-colors duration-300',
                   index < step ? 'bg-primary' : 'bg-muted',
@@ -772,10 +776,10 @@ function BuildScene({
           </div>
           <p className="sr-only" aria-live="polite">
             {done
-              ? '工具做好了'
-              : step < BUILD_STEPS.length
-                ? `正在${BUILD_STEPS[step]}`
-                : '正在收尾'}
+              ? t('guide.srDone')
+              : step < BUILD_STEP_KEYS.length
+                ? t('guide.srDoing', { step: t(BUILD_STEP_KEYS[step]) })
+                : t('guide.srWrapup')}
           </p>
         </section>
 
@@ -784,7 +788,7 @@ function BuildScene({
           onClick={onSkip}
           className="mx-auto mt-3 flex min-h-tap items-center text-caption text-primary-foreground/80 underline decoration-primary-foreground/40 underline-offset-4 active:opacity-80"
         >
-          跳过演示，直接看结果
+          {t('guide.skipDemo')}
         </button>
       </div>
     </div>
@@ -796,14 +800,15 @@ function BuildScene({
  * ------------------------------------------------------------------ */
 
 function UseScene({ brief }: { brief: string }) {
+  const { t } = useI18n()
   return (
     <div className="onboarding-scene flex min-h-full flex-col">
       <div className="my-auto">
         <div className="text-center">
-          <h2 className="text-display font-semibold">点开就能用</h2>
+          <h2 className="text-display font-semibold">{t('guide.useTitle')}</h2>
           <p className="mt-1.5 line-clamp-1 text-body text-primary-foreground/80">「{brief}」</p>
           <p className="mt-1 text-caption text-primary-foreground/80">
-            你的那句话，会变成这样一个小工具
+            {t('guide.useHint')}
           </p>
         </div>
 
@@ -813,23 +818,23 @@ function UseScene({ brief }: { brief: string }) {
               <MiniMark />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-title font-semibold">口袋钢琴</p>
-              <p className="text-caption text-muted-foreground">一句话生成 · 点两下试试</p>
+              <p className="text-title font-semibold">{t('guide.pianoName')}</p>
+              <p className="text-caption text-muted-foreground">{t('guide.pianoHint')}</p>
             </div>
             <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption text-muted-foreground">
-              示例
+              {t('guide.sample')}
             </span>
           </header>
 
           <PocketPiano />
 
           <p className="mt-2 text-center text-caption text-muted-foreground">
-            声音走系统媒体音量，弹奏不会上传
+            {t('guide.pianoPrivacy')}
           </p>
         </section>
 
         <p className="mt-3 text-center text-caption text-primary-foreground/80">
-          每个权限都会先问你，可随时收回
+          {t('guide.permissions')}
         </p>
       </div>
     </div>
@@ -842,6 +847,7 @@ const MELODY = [7, 7, 7, 7, 6, 4, 2, 4] as const
 
 /** 演示用的小钢琴：Web Audio 合成，不加载任何外部音频 */
 function PocketPiano() {
+  const { t } = useI18n()
   const [played, setPlayed] = useState<number | null>(null)
   const audioRef = useRef<AudioContext | null>(null)
   const resetRef = useRef<number | null>(null)
@@ -902,13 +908,13 @@ function PocketPiano() {
 
   return (
     <div className="mt-4">
-      <div className="flex h-32 items-stretch gap-1" role="group" aria-label="口袋钢琴琴键">
+      <div className="flex h-32 items-stretch gap-1" role="group" aria-label={t('guide.pianoKeys')}>
         {PIANO_KEYS.map((key, index) => (
           <button
             key={`${key.note}-${index}`}
             type="button"
             onClick={() => play(index)}
-            aria-label={`弹 ${key.note}`}
+            aria-label={t('guide.playKey', { note: key.note })}
             className={cn(
               'flex min-w-0 flex-1 flex-col items-center justify-end rounded-b-lg border border-border pb-2 text-caption transition-transform duration-100',
               index === PIANO_KEYS.length - 1
@@ -924,7 +930,7 @@ function PocketPiano() {
         ))}
       </div>
       <p className="mt-2 text-center text-caption text-muted-foreground" aria-live="polite">
-        {played === null ? '点一下琴键，听听看' : `正在弹 ${PIANO_KEYS[played].note}`}
+        {played === null ? t('guide.tapKey') : t('guide.playing', { note: PIANO_KEYS[played].note })}
       </p>
     </div>
   )

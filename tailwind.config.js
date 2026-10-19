@@ -28,6 +28,16 @@ export default {
           foreground: 'rgb(var(--primary-foreground) / <alpha-value>)',
           soft: 'rgb(var(--primary-soft) / <alpha-value>)',
         },
+        // 品牌蓝固定值：不随主题变化（引导页整屏、白色 CTA 上的品牌字）
+        brand: {
+          DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
+          foreground: 'rgb(var(--brand-foreground) / <alpha-value>)',
+        },
+        // 代码控制台：深色模式下也保持深底浅字
+        console: {
+          DEFAULT: 'rgb(var(--console) / <alpha-value>)',
+          foreground: 'rgb(var(--console-foreground) / <alpha-value>)',
+        },
         secondary: {
           DEFAULT: 'rgb(var(--secondary) / <alpha-value>)',
           foreground: 'rgb(var(--secondary-foreground) / <alpha-value>)',

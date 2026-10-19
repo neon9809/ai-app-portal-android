@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 
 import { usePageTitle } from '@/app/layout/PageTitle'
+import { useI18n } from '@/shared/i18n'
 import { invokeNative } from '@/shared/bridge'
 import {
   addAudit,
@@ -48,26 +49,26 @@ import { EmptyState, Spinner } from '@/shared/ui/Feedback'
 import { useToast } from '@/shared/ui/Toast'
 
 const CAPABILITY_LABEL: Record<AppCapabilityKey, string> = {
-  storage: '保存数据到本机',
-  llm: '使用 AI',
-  network: '访问网络',
-  clipboard: '读写剪贴板',
-  files: '使用文件',
-  bluetooth: '使用蓝牙',
-  record: '使用麦克风',
-  camera: '使用相机',
-  location: '获取位置',
-  notifications: '给你发提醒',
-  triggers: '设置触发器',
-  deviceApps: '打开其它应用',
-  deviceFiles: '管理本机文件',
-  deviceUpload: '上传文件',
-  deviceHaptics: '震动反馈',
-  deviceSpeech: '语音播报',
-  deviceSystem: '修改系统设置',
-  deviceRecorder: '用快记录音',
-  deviceCameraModes: '相机模式',
-  deviceWeather: '查询天气',
+  storage: 'cap.storage.title',
+  llm: 'cap.llm.title',
+  network: 'cap.network.title',
+  clipboard: 'cap.clipboard.title',
+  files: 'cap.files.title',
+  bluetooth: 'cap.bluetooth.title',
+  record: 'cap.record.title',
+  camera: 'cap.camera.title',
+  location: 'cap.location.title',
+  notifications: 'cap.notifications.title',
+  triggers: 'cap.triggers.title',
+  deviceApps: 'cap.deviceApps.title',
+  deviceFiles: 'cap.deviceFiles.title',
+  deviceUpload: 'cap.deviceUpload.title',
+  deviceHaptics: 'cap.deviceHaptics.title',
+  deviceSpeech: 'cap.deviceSpeech.title',
+  deviceSystem: 'cap.deviceSystem.title',
+  deviceRecorder: 'cap.deviceRecorder.title',
+  deviceCameraModes: 'cap.deviceCameraModes.title',
+  deviceWeather: 'cap.deviceWeather.title',
 }
 
 const CAPABILITY_ORDER: AppCapabilityKey[] = [
@@ -114,7 +115,8 @@ export function AppDetailPage() {
   const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
   const [deletingRevision, setDeletingRevision] = useState(false)
 
-  usePageTitle(app?.name ?? '应用详情')
+  const { t } = useI18n()
+  usePageTitle(app?.name ?? t('detail.title'))
 
   const load = useCallback(async () => {
     const found = await getApp(id)
@@ -158,9 +160,9 @@ export function AppDetailPage() {
       }
     }
     if (copied) {
-      toast({ title: '源码已复制', tone: 'success' })
+      toast({ title: t('detail.copied'), tone: 'success' })
     } else {
-      toast({ title: '复制失败', description: '请长按下方源码手动选择', tone: 'danger' })
+      toast({ title: t('detail.copyFail'), description: t('detail.copyFailDesc'), tone: 'danger' })
     }
   }
 
@@ -178,12 +180,12 @@ export function AppDetailPage() {
         at: now(),
       })
       toast({
-        title: '已导出 .neon-aap',
-        description: '如果系统没有弹出保存，可以用「复制源码」保存',
+        title: t('detail.exported'),
+        description: t('detail.exportedDesc'),
         tone: 'success',
       })
     } catch (error) {
-      toast({ title: '导出失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('detail.exportFail'), description: (error as Error).message, tone: 'danger' })
     }
   }
 
@@ -197,14 +199,14 @@ export function AppDetailPage() {
         appId: app.id,
         appName: app.name,
         kind: 'storage.clear',
-        detail: '清空应用数据',
+        detail: t('detail.clearAudit'),
         at: now(),
       })
       setBytes(0)
       setConfirmClear(false)
-      toast({ title: '数据已清空', tone: 'success' })
+      toast({ title: t('detail.cleared'), tone: 'success' })
     } catch (error) {
-      toast({ title: '清空失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('detail.clearFail'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -227,11 +229,11 @@ export function AppDetailPage() {
       appId: app.id,
       appName: app.name,
       kind: 'capability.revoke',
-      detail: `撤回「${CAPABILITY_LABEL[capability]}」`,
+      detail: t('detail.revokeAudit', { cap: t(CAPABILITY_LABEL[capability]) }),
       at: now(),
     })
     setGrants((current) => current.filter((item) => item.capability !== capability))
-    toast({ title: `已撤回「${CAPABILITY_LABEL[capability]}」`, tone: 'info' })
+    toast({ title: t('detail.revoked', { cap: t(CAPABILITY_LABEL[capability]) }), tone: 'info' })
   }
 
   const rollback = async (index: number) => {
@@ -240,9 +242,9 @@ export function AppDetailPage() {
     try {
       await rollbackRevision(app.id, index)
       await load()
-      toast({ title: '已回到那一版', tone: 'success' })
+      toast({ title: t('studio.rolledBack'), tone: 'success' })
     } catch (error) {
-      toast({ title: '回滚失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('studio.rollbackFail'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -258,12 +260,14 @@ export function AppDetailPage() {
       await load()
       toast({
         title:
-          removedCount > 1 ? `已删除这一版及之后的 ${removedCount - 1} 条记录` : '已删除这一版',
-        description: '工具已回退到这一版之前',
+          removedCount > 1
+            ? t('studio.deletedMany', { count: removedCount - 1 })
+            : t('studio.deletedOne'),
+        description: t('studio.deletedDesc'),
         tone: 'success',
       })
     } catch (error) {
-      toast({ title: '删除失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('studio.deleteFail'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setDeletingRevision(false)
     }
@@ -279,13 +283,13 @@ export function AppDetailPage() {
         appId: app.id,
         appName: app.name,
         kind: 'app.delete',
-        detail: '删除应用与数据',
+        detail: t('detail.deleteAudit'),
         at: now(),
       })
-      toast({ title: '已删除', tone: 'info' })
+      toast({ title: t('detail.deletedApp'), tone: 'info' })
       navigate('/')
     } catch (error) {
-      toast({ title: '删除失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('studio.deleteFail'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -294,7 +298,7 @@ export function AppDetailPage() {
   if (app === undefined) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
-        <Spinner label="正在打开工具" />
+        <Spinner label={t('detail.opening')} />
       </div>
     )
   }
@@ -302,9 +306,9 @@ export function AppDetailPage() {
   if (app === null) {
     return (
       <EmptyState
-        title="找不到这个应用"
-        description="它可能已经被删除了。"
-        action={<Button onClick={() => navigate('/')}>回到我的工具</Button>}
+        title={t('detail.notFound')}
+        description={t('detail.notFoundDesc')}
+        action={<Button onClick={() => navigate('/')}>{t('detail.backHome')}</Button>}
       />
     )
   }
@@ -340,8 +344,8 @@ export function AppDetailPage() {
         >
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <Settings className="size-4 text-muted-foreground" aria-hidden />
-            <span className="text-body">应用设置</span>
-            <span className="text-caption text-muted-foreground">通知与触发器</span>
+            <span className="text-body">{t('detail.appSettings')}</span>
+            <span className="text-caption text-muted-foreground">{t('detail.appSettingsHint')}</span>
           </div>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
         </button>
@@ -351,9 +355,9 @@ export function AppDetailPage() {
         <ul>
           <li className="list-row py-3">
             <div className="min-w-0 flex-1">
-              <p className="text-body">生成模型</p>
+              <p className="text-body">{t('detail.genModel')}</p>
               <p className="text-caption text-muted-foreground">
-                {app.manifest.generated.model || '未知'} · {app.turns} 轮
+                {app.manifest.generated.model || t('detail.unknown')} · {t('detail.turns', { count: app.turns })}
               </p>
             </div>
             <span className="text-caption text-muted-foreground">
@@ -362,13 +366,15 @@ export function AppDetailPage() {
           </li>
           <li className="list-row py-3">
             <div className="min-w-0 flex-1">
-              <p className="text-body">用量</p>
+              <p className="text-body">{t('detail.usage')}</p>
               <p className="text-caption text-muted-foreground">
-                {usage.length} 次调用 · 输入 {totalIn} / 输出 {totalOut} tokens
+                {t('detail.usageValue', { count: usage.length, in: totalIn, out: totalOut })}
               </p>
               {app.manifest.capabilities.llm && (
                 <p className="mt-0.5 text-caption text-muted-foreground">
-                  本月应用 AI：{monthTokens} tokens{budget ? ` / 上限 ${budget}` : ' · 不限'}
+                  {budget
+                    ? t('detail.monthBudget', { tokens: monthTokens, budget })
+                    : t('detail.monthNoBudget', { tokens: monthTokens })}
                 </p>
               )}
             </div>
@@ -381,18 +387,18 @@ export function AppDetailPage() {
                   setShowBudget(true)
                 }}
               >
-                额度
+                {t('detail.budget')}
               </Button>
             )}
           </li>
           <li className="list-row py-3">
             <div className="min-w-0 flex-1">
-              <p className="text-body">本机数据</p>
+              <p className="text-body">{t('detail.storage')}</p>
               <p className="text-caption text-muted-foreground">{formatBytes(bytes)}</p>
             </div>
             {bytes > 0 && (
               <Button size="sm" variant="ghost" onClick={() => setConfirmClear(true)}>
-                清空
+                {t('detail.clear')}
               </Button>
             )}
           </li>
@@ -401,9 +407,9 @@ export function AppDetailPage() {
 
       <section className="overflow-hidden rounded-lg border border-border bg-surface">
         <div className="px-4 pt-3">
-          <p className="text-body font-medium">能力授权</p>
+          <p className="text-body font-medium">{t('detail.capsTitle')}</p>
           <p className="mt-0.5 text-caption text-muted-foreground">
-            应用第一次用到某项能力时会问你；这里可以随时撤回。
+            {t('detail.capsHint')}
           </p>
         </div>
         <ul className="mt-1">
@@ -431,10 +437,10 @@ export function AppDetailPage() {
                     onClick={() => void revoke(capability)}
                     className="min-h-tap text-caption text-danger"
                   >
-                    撤回
+                    {t('detail.revoke')}
                   </button>
                 ) : (
-                  <span className="text-caption text-muted-foreground">未授权</span>
+                  <span className="text-caption text-muted-foreground">{t('detail.notGranted')}</span>
                 )}
               </li>
             )
@@ -445,10 +451,10 @@ export function AppDetailPage() {
       <section className="rounded-lg border border-border bg-surface p-3">
         <div className="flex items-center gap-2">
           <Code2 className="size-4 text-muted-foreground" aria-hidden />
-          <p className="text-body font-medium">开发面板</p>
+          <p className="text-body font-medium">{t('detail.devPanel')}</p>
         </div>
         <p className="mt-1 text-caption text-muted-foreground">
-          继续用对话修改这个应用。
+          {t('detail.devPanelHint')}
         </p>
         <Button
           className="mt-2"
@@ -456,7 +462,7 @@ export function AppDetailPage() {
           onClick={() => navigate(`/studio?app=${app.id}`)}
         >
           <MessageSquarePlus className="size-4" aria-hidden />
-          继续开发
+          {t('detail.continueDev')}
         </Button>
         <button
           type="button"
@@ -465,9 +471,9 @@ export function AppDetailPage() {
         >
           <span className="flex items-center gap-2 text-body">
             <FileCode2 className="size-4 text-muted-foreground" aria-hidden />
-            查看源码
+            {t('detail.viewSource')}
           </span>
-          <span className="text-caption text-muted-foreground">{showSource ? '收起' : '展开'}</span>
+          <span className="text-caption text-muted-foreground">{showSource ? t('detail.collapse') : t('detail.expand')}</span>
         </button>
         {showSource && (
           <pre className="mt-2 max-h-[50dvh] overflow-auto rounded-md bg-muted p-3 font-mono text-caption leading-relaxed">
@@ -481,26 +487,26 @@ export function AppDetailPage() {
         >
           <span className="flex items-center gap-2 text-body">
             <ScrollText className="size-4 text-muted-foreground" aria-hidden />
-            调试日志
+            {t('detail.debugLogs')}
           </span>
-          <span className="text-caption text-muted-foreground">{logs.length} 条</span>
+          <span className="text-caption text-muted-foreground">{t('detail.logCount', { count: logs.length })}</span>
         </button>
       </section>
 
       <section className="rounded-lg border border-border bg-surface p-3">
-        <p className="text-body font-medium">分享与审计</p>
+        <p className="text-body font-medium">{t('detail.shareTitle')}</p>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <Button variant="outline" onClick={() => void exportPackage()}>
             <Download className="size-4" aria-hidden />
-            导出包
+            {t('detail.exportPackage')}
           </Button>
           <Button variant="outline" onClick={() => void copySource()}>
             <Clipboard className="size-4" aria-hidden />
-            复制源码
+            {t('detail.copySource')}
           </Button>
         </div>
         <p className="mt-2 text-caption text-muted-foreground">
-          导出的是 .neon-aap 文件，包含 manifest 与完整源码，任何人可打开审计。
+          {t('detail.exportNote')}
         </p>
       </section>
 
@@ -508,7 +514,7 @@ export function AppDetailPage() {
         <section className="overflow-hidden rounded-lg border border-border bg-surface">
           <div className="flex items-center gap-2 px-4 pt-3">
             <History className="size-4 text-muted-foreground" aria-hidden />
-            <p className="text-body font-medium">修改记录</p>
+            <p className="text-body font-medium">{t('detail.revisionsTitle')}</p>
           </div>
           <ul className="mt-1">
             {app.revisions.map((revision, index) => (
@@ -526,7 +532,7 @@ export function AppDetailPage() {
                     loading={busy}
                     onClick={() => void rollback(index)}
                   >
-                    回到这一版
+                    {t('studio.backToVersion')}
                   </Button>
                   <Button
                     size="sm"
@@ -534,7 +540,7 @@ export function AppDetailPage() {
                     disabled={busy}
                     onClick={() => setDeleteTarget(index)}
                   >
-                    删除这一版
+                    {t('studio.deleteVersion')}
                   </Button>
                 </div>
               </li>
@@ -545,21 +551,21 @@ export function AppDetailPage() {
 
       <Button variant="danger-ghost" block onClick={() => setConfirmDelete(true)}>
         <Trash2 className="size-4" aria-hidden />
-        删除这个应用与它的数据
+        {t('detail.deleteApp')}
       </Button>
       <p className="pb-2 text-center text-caption text-muted-foreground">
-        删除后本机数据不可恢复，建议先导出或备份。
+        {t('detail.deleteAppNote')}
       </p>
 
       <Dialog
         open={showBudget}
         onClose={() => setShowBudget(false)}
-        title="AI 月度额度"
-        description="只统计这个应用调用 AI 的 token；留空表示不限。"
+        title={t('detail.budgetTitle')}
+        description={t('detail.budgetDesc')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowBudget(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button
               onClick={() => {
@@ -568,7 +574,7 @@ export function AppDetailPage() {
                   await setBudget(app.id, Number.isFinite(value) && value > 0 ? value : null)
                   setShowBudget(false)
                   await load()
-                  toast({ title: '额度已更新', tone: 'success' })
+                  toast({ title: t('detail.budgetSaved'), tone: 'success' })
                 })()
               }}
             >
@@ -578,7 +584,7 @@ export function AppDetailPage() {
         }
       >
         <label htmlFor="budget-input" className="text-caption font-medium">
-          每月最多使用（tokens）
+          {t('detail.budgetLabel')}
         </label>
         <input
           id="budget-input"
@@ -587,19 +593,19 @@ export function AppDetailPage() {
           min={0}
           value={budgetInput}
           onChange={(event) => setBudgetInput(event.target.value)}
-          placeholder="留空表示不限"
+          placeholder={t('detail.budgetPlaceholder')}
           className="mt-1 w-full rounded-md border border-input bg-surface px-3 py-2.5 text-body outline-none focus:border-primary"
         />
         <p className="mt-2 text-caption text-muted-foreground">
-          本月已用 {monthTokens} tokens。达到上限后，应用里的 AI 功能会提示你调整额度。
+          {t('detail.budgetUsed', { tokens: monthTokens })}
         </p>
       </Dialog>
 
       <Dialog
         open={showLogs}
         onClose={() => setShowLogs(false)}
-        title="调试日志"
-        description="只在本机保留最近 500 条，按时间倒序。"
+        title={t('detail.logsTitle')}
+        description={t('detail.logsDesc')}
         footer={
           <>
             <Button
@@ -608,20 +614,20 @@ export function AppDetailPage() {
                 void clearLogs(app.id).then(() => {
                   setLogs([])
                   setShowLogs(false)
-                  toast({ title: '日志已清空', tone: 'info' })
+                  toast({ title: t('detail.logsCleared'), tone: 'info' })
                 })
               }}
             >
-              清空日志
+              {t('detail.clearLogs')}
             </Button>
             <Button variant="outline" onClick={() => setShowLogs(false)}>
-              关闭
+              {t('common.close')}
             </Button>
           </>
         }
       >
         {logs.length === 0 ? (
-          <p className="text-caption text-muted-foreground">这个工具还没有产生日志。</p>
+          <p className="text-caption text-muted-foreground">{t('detail.noLogs')}</p>
         ) : (
           <ul className="max-h-[55dvh] space-y-2 overflow-y-auto">
             {logs.slice(0, 60).map((log) => (
@@ -658,39 +664,39 @@ export function AppDetailPage() {
       <Dialog
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
-        title="清空这个应用的数据？"
-        description="应用保存的所有数据都会被删除，代码与权限不受影响。"
+        title={t('detail.clearDataTitle')}
+        description={t('detail.clearDataDesc')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmClear(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" onClick={() => void clearData()} disabled={busy}>
-              {busy ? '清空中…' : '清空数据'}
+              {busy ? t('detail.clearing') : t('detail.clearDataBtn')}
             </Button>
           </>
         }
       >
-        <p className="text-caption text-muted-foreground">建议先导出备份或 .neon-aap 包。</p>
+        <p className="text-caption text-muted-foreground">{t('detail.clearDataNote')}</p>
       </Dialog>
 
       <Dialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title="删除这个应用？"
-        description="应用代码和它保存的所有数据都会被移除，无法恢复。"
+        title={t('detail.deleteAppTitle')}
+        description={t('detail.deleteAppDesc')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmDelete(false)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" loading={busy} onClick={() => void remove()}>
-              删除
+              {t('detail.deleteBtn')}
             </Button>
           </>
         }
       >
-        <p className="text-body">要删除的是「{app.name}」。</p>
+        <p className="text-body">{t('detail.deletingName', { name: app.name })}</p>
       </Dialog>
 
       <Dialog
@@ -698,8 +704,8 @@ export function AppDetailPage() {
         onClose={() => {
           if (!deletingRevision) setDeleteTarget(null)
         }}
-        title="删除这一版？"
-        description="工具会回退到这一版之前的状态；这一版之后、依赖它的修改记录也会一起删除。此操作不可撤销。"
+        title={t('studio.deleteTitle')}
+        description={t('studio.deleteDesc')}
         footer={
           <>
             <Button
@@ -707,14 +713,14 @@ export function AppDetailPage() {
               disabled={deletingRevision}
               onClick={() => setDeleteTarget(null)}
             >
-              取消
+              {t('common.cancel')}
             </Button>
             <Button
               variant="danger"
               loading={deletingRevision}
               onClick={() => void removeRevision()}
             >
-              删除并回退
+              {t('studio.deleteConfirm')}
             </Button>
           </>
         }

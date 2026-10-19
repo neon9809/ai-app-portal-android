@@ -4,6 +4,7 @@ import { ChevronLeft, KeyRound, Menu, Plus } from 'lucide-react'
 
 import { cn } from '@/shared/lib/cn'
 import { useModelConfigured } from '@/shared/hooks/useModelConfigured'
+import { useI18n } from '@/shared/i18n'
 import { PageTitleProvider } from './PageTitle'
 import { SideMenu } from './SideMenu'
 import { TopBleedScrim } from './TopBleedScrim'
@@ -28,7 +29,8 @@ export function AppShell() {
 
   const isHome = pathname === '/'
   const hasHeader = isHome || pageTitle !== undefined
-  const title = isHome ? '我的应用' : pageTitle
+  const { t } = useI18n()
+  const title = isHome ? t('nav.myApps') : pageTitle
 
   // 换页时收起抽屉，避免菜单盖住新页面
   useEffect(() => {
@@ -58,7 +60,7 @@ export function AppShell() {
               <button
                 type="button"
                 onClick={() => setMenuOpen(true)}
-                aria-label="打开菜单"
+                aria-label={t('nav.openMenu')}
                 className="-ml-2 flex size-11 items-center justify-center rounded-md text-foreground active:bg-accent"
               >
                 <Menu className="size-6" aria-hidden />
@@ -67,7 +69,7 @@ export function AppShell() {
               <button
                 type="button"
                 onClick={() => navigate(-1)}
-                aria-label="返回"
+                aria-label={t('nav.back')}
                 className="-ml-2 flex size-11 items-center justify-center rounded-md text-foreground active:bg-accent"
               >
                 <ChevronLeft className="size-6" aria-hidden />
@@ -82,7 +84,7 @@ export function AppShell() {
               <button
                 type="button"
                 onClick={() => navigate('/studio')}
-                aria-label="新建工具"
+                aria-label={t('nav.newTool')}
                 className="-mr-2 flex size-11 items-center justify-center rounded-md text-primary active:bg-accent"
               >
                 <Plus className="size-6" aria-hidden />
@@ -96,7 +98,7 @@ export function AppShell() {
                 className="-mr-2 flex min-h-tap items-center gap-1 rounded-md px-2 text-caption font-medium text-primary active:bg-accent"
               >
                 <KeyRound className="size-4" aria-hidden />
-                添加大模型API
+                {t('nav.addModelApi')}
               </button>
             )}
           </div>

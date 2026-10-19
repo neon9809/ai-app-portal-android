@@ -38,6 +38,7 @@ import {
 import { now, uid } from '@/shared/portal/utils'
 import { Button } from '@/shared/ui/Button'
 import { Dialog } from '@/shared/ui/Dialog'
+import { resolveLocale, translate } from '@/shared/i18n'
 
 type RuntimeCapability = AppCapabilityKey
 
@@ -60,95 +61,27 @@ function getMcpBridge(): McpBridge | null {
   return bridge && typeof bridge.callTool === 'function' ? bridge : null
 }
 
-const CAPABILITY_TEXT: Record<RuntimeCapability, { title: string; description: string }> = {
-  storage: {
-    title: '保存到本机',
-    description: '这个工具想在本机保存数据。数据只留在这台设备上，不会上传。',
-  },
-  llm: {
-    title: '使用 AI',
-    description: '这个工具会把你输入的内容发送给你配置的模型服务。',
-  },
-  network: {
-    title: '访问网络',
-    description: '这个工具会访问它在权限卡里声明的网站。',
-  },
-  clipboard: {
-    title: '读写剪贴板',
-    description: '这个工具会读写系统剪贴板，用来粘贴内容或复制结果。',
-  },
-  files: {
-    title: '使用文件',
-    description: '这个工具可以让你选择本机文件，或把 https 文件下载到应用目录。',
-  },
-  bluetooth: {
-    title: '使用蓝牙',
-    description: '这个工具会扫描并连接附近的蓝牙设备（BLE）。',
-  },
-  record: {
-    title: '使用麦克风',
-    description: '这个工具会打开麦克风录音，录到的音频保存在本机。',
-  },
-  camera: {
-    title: '使用相机',
-    description: '这个工具会打开系统相机拍照或录像。',
-  },
-  location: {
-    title: '获取位置',
-    description: '这个工具会读取你当前的位置，只用于它自己的功能。',
-  },
-  notifications: {
-    title: '给你发提醒',
-    description:
-      '这个工具会在门户里给你发提醒（横幅，可选震动）。它不是系统通知栏推送，门户关掉后不会送达。',
-  },
-  triggers: {
-    title: '设置触发器',
-    description:
-      '这个工具可以按时间或位置注册触发器。门户打开时才会检查；关闭门户后不会在后台唤醒，错过的时间提醒会在下次打开时补发。',
-  },
-  deviceApps: {
-    title: '打开其它应用',
-    description:
-      '这个工具可以查看你装了哪些应用、按名字或包名打开其它应用、在浏览器里打开网页、发通知，以及读取屏幕尺寸。',
-  },
-  deviceFiles: {
-    title: '管理本机文件',
-    description:
-      '这个工具可以在本机文件里搜索、列出、创建、移动、重命名文件和文件夹，也能读取回收站列表。它不会上传文件。',
-  },
-  deviceUpload: {
-    title: '上传文件',
-    description: '这个工具会把本机文件上传到服务端。上传前请确认文件内容可以外传。',
-  },
-  deviceHaptics: {
-    title: '震动反馈',
-    description: '这个工具会让手机震动，用来做点击或计时提醒。',
-  },
-  deviceSpeech: {
-    title: '语音播报',
-    description: '这个工具会把文字用系统语音读出来。播报会打断正在播放的音乐或视频。',
-  },
-  deviceSystem: {
-    title: '修改系统设置',
-    description:
-      '这个工具可以打开系统的网络设置页面，并修改蓝牙开关、媒体音量、锁屏提示音、来电翻转静音等设置。',
-  },
-  deviceRecorder: {
-    title: '用快记录音',
-    description:
-      '这个工具会打开系统里的「快记」应用开始、暂停或结束录音。录音文件保存在快记里，不会进入这个工具。',
-  },
-  deviceCameraModes: {
-    title: '相机模式',
-    description:
-      '这个工具会打开系统相机，并切换到美颜或自拍模式。它只打开相机，不会替你拍照。',
-  },
-  deviceWeather: {
-    title: '查询天气',
-    description:
-      '这个工具会向天气服务查询你指定城市或当前所在地的天气。按当前位置查询时会读取定位。',
-  },
+const CAPABILITY_TEXT: Record<RuntimeCapability, { titleKey: string; descriptionKey: string }> = {
+  storage: { titleKey: 'cap.storage.title', descriptionKey: 'cap.storage.desc' },
+  llm: { titleKey: 'cap.llm.title', descriptionKey: 'cap.llm.desc' },
+  network: { titleKey: 'cap.network.title', descriptionKey: 'cap.network.desc' },
+  clipboard: { titleKey: 'cap.clipboard.title', descriptionKey: 'cap.clipboard.desc' },
+  files: { titleKey: 'cap.files.title', descriptionKey: 'cap.files.desc' },
+  bluetooth: { titleKey: 'cap.bluetooth.title', descriptionKey: 'cap.bluetooth.desc' },
+  record: { titleKey: 'cap.record.title', descriptionKey: 'cap.record.desc' },
+  camera: { titleKey: 'cap.camera.title', descriptionKey: 'cap.camera.desc' },
+  location: { titleKey: 'cap.location.title', descriptionKey: 'cap.location.desc' },
+  notifications: { titleKey: 'cap.notifications.title', descriptionKey: 'cap.notifications.desc' },
+  triggers: { titleKey: 'cap.triggers.title', descriptionKey: 'cap.triggers.desc' },
+  deviceApps: { titleKey: 'cap.deviceApps.title', descriptionKey: 'cap.deviceApps.desc' },
+  deviceFiles: { titleKey: 'cap.deviceFiles.title', descriptionKey: 'cap.deviceFiles.desc' },
+  deviceUpload: { titleKey: 'cap.deviceUpload.title', descriptionKey: 'cap.deviceUpload.desc' },
+  deviceHaptics: { titleKey: 'cap.deviceHaptics.title', descriptionKey: 'cap.deviceHaptics.desc' },
+  deviceSpeech: { titleKey: 'cap.deviceSpeech.title', descriptionKey: 'cap.deviceSpeech.desc' },
+  deviceSystem: { titleKey: 'cap.deviceSystem.title', descriptionKey: 'cap.deviceSystem.desc' },
+  deviceRecorder: { titleKey: 'cap.deviceRecorder.title', descriptionKey: 'cap.deviceRecorder.desc' },
+  deviceCameraModes: { titleKey: 'cap.deviceCameraModes.title', descriptionKey: 'cap.deviceCameraModes.desc' },
+  deviceWeather: { titleKey: 'cap.deviceWeather.title', descriptionKey: 'cap.deviceWeather.desc' },
 }
 
 /**
@@ -158,6 +91,11 @@ const CAPABILITY_TEXT: Record<RuntimeCapability, { title: string; description: s
 export function SandboxFrame({ app }: { app: PortalApp }) {
   const frameRef = useRef<HTMLIFrameElement>(null)
   const traceId = useMemo(() => uid('t_'), [app.id, app.updatedAt])
+  const locale = resolveLocale()
+  const tr = useCallback(
+    (key: string, params?: Record<string, string | number>) => translate(locale, key, params),
+    [locale],
+  )
   const [reloadKey, setReloadKey] = useState(0)
   const [prompt, setPrompt] = useState<RuntimeCapability | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -240,11 +178,11 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
       const bridge = getMcpBridge()
       if (!bridge) {
         throw new Error(
-          '当前环境不支持设备能力（浏览器预览只能查看界面），请在手机上的 AI应用门户 里打开',
+          tr('cap.deviceUnsupported'),
         )
       }
       if (!(await deviceAvailable())) {
-        throw new Error('设备服务暂时不可用，请稍后重试')
+        throw new Error(tr('cap.deviceUnavailable'))
       }
 
       let raw: unknown
@@ -257,10 +195,10 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
           appId: app.id,
           traceId,
           level: 'error',
-          message: `设备能力调用失败：${name}（连接器 ${connector}）`,
+          message: tr('cap.deviceCallFail', { name, connector }),
           at: now(),
         })
-        throw new Error('设备能力调用失败，请稍后重试')
+        throw new Error(tr('cap.deviceCallRetry'))
       }
 
       const result = (raw ?? {}) as McpCallResult
@@ -273,10 +211,10 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
           appId: app.id,
           traceId,
           level: 'error',
-          message: `设备能力返回失败：${name}（连接器 ${connector}）`,
+          message: tr('cap.deviceResultFail', { name, connector }),
           at: now(),
         })
-        throw new Error('设备能力调用失败，请稍后重试')
+        throw new Error(tr('cap.deviceCallRetry'))
       }
       return result.structuredContent ?? result.content ?? null
     },
@@ -321,7 +259,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
       frameEscapedRef.current = true
       frameReadyRef.current = false
       triggerQueueRef.current = []
-      setError('应用尝试跳转到外部页面，已阻止')
+      setError(tr('cap.escaped'))
       return
     }
     flushTriggers()
@@ -467,7 +405,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
             appId: app.id,
             appName: app.name,
             kind: 'capability.grant',
-            detail: `授权「${CAPABILITY_TEXT[capability].title}」`,
+            detail: tr('cap.grantDetail', { title: tr(CAPABILITY_TEXT[capability].titleKey) }),
             at: now(),
           })
         } catch {
@@ -622,7 +560,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
             appId: app.id,
             appName: app.name,
             kind: 'network.block',
-            detail: `拦截 ${host}（${url.slice(0, 120)}）`,
+            detail: tr('cap.blockHost', { host, url: url.slice(0, 120) }),
             at: now(),
           })
           void addLog({
@@ -630,7 +568,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
             appId: app.id,
             traceId,
             level: 'warn',
-            message: `已拦截未声明白名单的请求：${host}`,
+            message: tr('cap.blockUndeclared', { host }),
             at: now(),
           })
         },
@@ -661,7 +599,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
           const result = await handleSandboxRequest(data, context, async (messages) => {
             const settings = await readLlmSettings()
             if (!isLlmConfigured(settings)) {
-              throw new Error('还没有配置模型，请到设置里填写 API Key')
+              throw new Error(tr('cap.noModel'))
             }
             await assertBudget(app.id)
             const model = settings.appModel.trim() || settings.model
@@ -673,7 +611,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
             '*',
           )
         } catch (cause) {
-          const message = (cause as Error)?.message ?? '能力调用失败'
+          const message = (cause as Error)?.message ?? tr('cap.callFailed')
           void addLog({
             id: uid('l_'),
             appId: app.id,
@@ -701,7 +639,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
       {error ? (
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <AlertTriangle className="size-8 text-warning" aria-hidden />
-          <p className="text-body font-medium">应用没能打开</p>
+          <p className="text-body font-medium">{tr('cap.openFailed')}</p>
           <p className="text-caption text-muted-foreground">{error}</p>
           <Button
             variant="outline"
@@ -713,7 +651,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
             }}
           >
             <RefreshCw className="size-4" aria-hidden />
-            重新加载
+            {tr('cap.reload')}
           </Button>
         </div>
       ) : (
@@ -725,36 +663,36 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
           sandbox="allow-scripts allow-forms"
           className="h-full w-full border-0 bg-surface"
           onLoad={handleFrameLoad}
-          onError={() => setError('页面加载失败，请重试')}
+          onError={() => setError(tr('cap.loadFailed'))}
         />
       )}
 
       <Dialog
         open={prompt !== null}
         onClose={() => void grant(false)}
-        title={prompt ? CAPABILITY_TEXT[prompt].title : ''}
-        description={prompt ? CAPABILITY_TEXT[prompt].description : undefined}
+        title={prompt ? tr(CAPABILITY_TEXT[prompt].titleKey) : ''}
+        description={prompt ? tr(CAPABILITY_TEXT[prompt].descriptionKey) : undefined}
         footer={
           <>
             <Button variant="ghost" onClick={() => void grant(false)}>
-              不允许
+              {tr('cap.deny')}
             </Button>
-            <Button onClick={() => void grant(true)}>允许</Button>
+            <Button onClick={() => void grant(true)}>{tr('cap.allow')}</Button>
           </>
         }
       >
         {prompt === 'network' && (
           <p className="text-body">
-            它能访问的地址：<span className="font-medium">{networkHosts.join('、') || '无'}</span>
+            {tr('cap.networkHosts')}<span className="font-medium">{networkHosts.join(', ') || tr('cap.none')}</span>
           </p>
         )}
         {prompt === 'llm' && (
           <p className="text-caption text-muted-foreground">
-            内容会发送到你在设置里填写的模型服务；没有配置模型时，这个功能会给出提示。
+            {tr('cap.llmNote')}
           </p>
         )}
         <p className="mt-3 text-caption text-muted-foreground">
-          这次授权只对这个工具有效，之后可以在设置里撤回。
+          {tr('cap.scopeNote')}
         </p>
       </Dialog>
     </div>

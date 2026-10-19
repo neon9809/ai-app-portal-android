@@ -7,8 +7,14 @@ import '@/shared/styles/globals.css'
 import { NativeProvider } from '@/shared/native/NativeProvider'
 import { initSafeArea } from '@/shared/native/safe-area'
 import { initViewportUnitsPolyfill } from '@/shared/native/viewport-units'
+import { I18nProvider, initLocale } from '@/shared/i18n'
+import { initTheme } from '@/shared/theme'
 import { ToastProvider } from '@/shared/ui/Toast'
 import { App } from './App'
+
+// 主题与语言先落地再渲染：默认跟随系统，也可用设置里的固定偏好
+initTheme()
+initLocale()
 
 const container = document.getElementById('root')
 if (!container) throw new Error('#root not found')
@@ -25,14 +31,16 @@ initViewportUnitsPolyfill()
 createRoot(container).render(
   <StrictMode>
     <NativeProvider>
-      <ToastProvider>
-        {/* WebView 里加载本地资源时没有服务端路由，统一用 HashRouter */}
-        <HashRouter>
-          {/* 屏幕方向（capsule/manifest.json 的 orientation）由壳在原生层锁定、
-              平台预览也按该字段限制横竖屏切换，H5 侧不做任何方向处理 */}
-          <App />
-        </HashRouter>
-      </ToastProvider>
+      <I18nProvider>
+        <ToastProvider>
+          {/* WebView 里加载本地资源时没有服务端路由，统一用 HashRouter */}
+          <HashRouter>
+            {/* 屏幕方向（capsule/manifest.json 的 orientation）由壳在原生层锁定、
+                平台预览也按该字段限制横竖屏切换，H5 侧不做任何方向处理 */}
+            <App />
+          </HashRouter>
+        </ToastProvider>
+      </I18nProvider>
     </NativeProvider>
   </StrictMode>,
 )

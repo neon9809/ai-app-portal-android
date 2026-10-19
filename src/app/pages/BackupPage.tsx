@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Download, RotateCcw, ShieldCheck, Upload } from 'lucide-react'
 
 import { usePageTitle } from '@/app/layout/PageTitle'
+import { useI18n } from '@/shared/i18n'
 import {
   decryptBackup,
   exportBackup,
@@ -20,7 +21,8 @@ import { Dialog } from '@/shared/ui/Dialog'
 import { useToast } from '@/shared/ui/Toast'
 
 export function BackupPage() {
-  usePageTitle('备份与恢复')
+  const { t, locale } = useI18n()
+  usePageTitle(t('backup.title'))
   const { toast } = useToast()
 
   const [passphrase, setPassphrase] = useState('')
@@ -49,11 +51,11 @@ export function BackupPage() {
 
   const handleExport = async () => {
     if (passphrase.trim().length < 6) {
-      toast({ title: '口令太短', description: '至少 6 个字符', tone: 'warning' })
+      toast({ title: t('backup.shortPass'), description: t('backup.shortPassDesc'), tone: 'warning' })
       return
     }
     if (passphrase !== confirmPassphrase) {
-      toast({ title: '两次口令不一致', tone: 'warning' })
+      toast({ title: t('backup.mismatch'), tone: 'warning' })
       return
     }
     setBusy(true)
@@ -64,12 +66,12 @@ export function BackupPage() {
       setConfirmPassphrase('')
       await load()
       toast({
-        title: '备份已导出',
-        description: '请把文件放到你能长期保存的地方，并记住口令',
+        title: t('backup.exported'),
+        description: t('backup.exportedDesc'),
         tone: 'success',
       })
     } catch (error) {
-      toast({ title: '导出失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('backup.exportFail'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -82,17 +84,17 @@ export function BackupPage() {
       setFileName(picked.name)
       setPendingBytes(picked.bytes)
     } catch (error) {
-      toast({ title: '读取失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('backup.readFail'), description: (error as Error).message, tone: 'danger' })
     }
   }
 
   const decryptPending = async () => {
     if (!pendingBytes) {
-      toast({ title: '先选择备份文件', tone: 'warning' })
+      toast({ title: t('backup.pickFirst'), tone: 'warning' })
       return
     }
     if (!restorePassphrase.trim()) {
-      toast({ title: '输入口令', tone: 'warning' })
+      toast({ title: t('backup.enterPass'), tone: 'warning' })
       return
     }
     setBusy(true)
@@ -101,7 +103,7 @@ export function BackupPage() {
       setPendingRestore(payload)
       setRestorePassphrase('')
     } catch (error) {
-      toast({ title: '打不开这个备份', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('backup.cantOpen'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -115,9 +117,9 @@ export function BackupPage() {
       setPendingRestore(null)
       setPendingBytes(null)
       await load()
-      toast({ title: '恢复完成', description: '应用与数据已回到备份时的状态', tone: 'success' })
+      toast({ title: t('backup.restored'), description: t('backup.restoredDesc'), tone: 'success' })
     } catch (error) {
-      toast({ title: '恢复失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('backup.restoreFail'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -130,9 +132,9 @@ export function BackupPage() {
       await restoreSnapshot(pendingSnapshot)
       setPendingSnapshot(null)
       await load()
-      toast({ title: '已回到这个快照', tone: 'success' })
+      toast({ title: t('backup.snapshotRestored'), tone: 'success' })
     } catch (error) {
-      toast({ title: '恢复失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('backup.restoreFail'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
     }
@@ -141,9 +143,9 @@ export function BackupPage() {
   const createSnapshot = async () => {
     setBusy(true)
     try {
-      await takeSnapshot('手动快照')
+      await takeSnapshot(t('backup.snapshotManual'))
       await load()
-      toast({ title: '快照已保存（只在本机）', tone: 'success' })
+      toast({ title: t('backup.snapshotSaved'), tone: 'success' })
     } finally {
       setBusy(false)
     }
@@ -154,21 +156,21 @@ export function BackupPage() {
       <section className="rounded-lg border border-border bg-surface p-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="size-4 text-primary" aria-hidden />
-          <p className="text-body font-medium">上一次备份</p>
+          <p className="text-body font-medium">{t('backup.lastBackupTitle')}</p>
         </div>
         <p className="mt-1 text-body">
-          {lastBackup ? `${formatRelativeTime(lastBackup)}（${formatDateTime(lastBackup)}）` : '还没有做过备份'}
+          {lastBackup ? `${formatRelativeTime(lastBackup, locale)}（${formatDateTime(lastBackup)}）` : t('backup.noBackupYet')}
         </p>
         <p className="mt-1 text-caption text-muted-foreground">
-          备份是一个加密文件，包含所有应用、应用数据、偏好与 API Key。
-          忘记口令就等于备份作废，没有找回方式。
+          {t('backup.whatTitle')}
+          {t('backup.whatWarn')}
         </p>
       </section>
 
       <section className="rounded-lg border border-border bg-surface p-3">
-        <p className="text-body font-medium">导出备份</p>
+        <p className="text-body font-medium">{t('backup.exportTitle')}</p>
         <label htmlFor="backup-pass" className="mt-2 block text-caption font-medium">
-          设置一个口令
+          {t('backup.setPass')}
         </label>
         <input
           id="backup-pass"
@@ -177,11 +179,11 @@ export function BackupPage() {
           autoCorrect="off"
           value={passphrase}
           onChange={(event) => setPassphrase(event.target.value)}
-          placeholder="至少 6 个字符"
+          placeholder={t('backup.passPlaceholder')}
           className="mt-1 w-full rounded-md border border-input bg-surface px-3 py-2.5 text-body outline-none focus:border-primary"
         />
         <label htmlFor="backup-pass2" className="mt-2 block text-caption font-medium">
-          再输一次
+          {t('backup.passAgain')}
         </label>
         <input
           id="backup-pass2"
@@ -190,30 +192,29 @@ export function BackupPage() {
           autoCorrect="off"
           value={confirmPassphrase}
           onChange={(event) => setConfirmPassphrase(event.target.value)}
-          placeholder="确认口令"
+          placeholder={t('backup.passConfirm')}
           className="mt-1 w-full rounded-md border border-input bg-surface px-3 py-2.5 text-body outline-none focus:border-primary"
         />
         <Button className="mt-3" block loading={busy} onClick={() => void handleExport()}>
           <Download className="size-4" aria-hidden />
-          导出加密备份
+          {t('backup.exportBtn')}
         </Button>
         <p className="mt-2 text-caption text-muted-foreground">
-          加密使用 AES-GCM；密钥由口令经 PBKDF2（31 万轮）派生。
-          浏览器环境没有 Argon2id，这是本机可实现的最接近方案。
+          {t('backup.cryptoNote')}
         </p>
       </section>
 
       <section className="rounded-lg border border-border bg-surface p-3">
-        <p className="text-body font-medium">从备份恢复</p>
+        <p className="text-body font-medium">{t('backup.restoreTitle')}</p>
         <p className="mt-0.5 text-caption text-muted-foreground">
-          恢复会用备份内容覆盖本机现有工具与数据。
+          {t('backup.restoreWarn')}
         </p>
         <Button variant="outline" className="mt-2" block onClick={() => void handlePickFile()}>
           <Upload className="size-4" aria-hidden />
-          {fileName || '选择备份文件'}
+          {fileName || t('backup.pickFile')}
         </Button>
         <label htmlFor="restore-pass" className="mt-2 block text-caption font-medium">
-          备份口令
+          {t('backup.passLabel')}
         </label>
         <input
           id="restore-pass"
@@ -222,26 +223,26 @@ export function BackupPage() {
           autoCorrect="off"
           value={restorePassphrase}
           onChange={(event) => setRestorePassphrase(event.target.value)}
-          placeholder="输入导出时设置的口令"
+          placeholder={t('backup.passEnter')}
           className="mt-1 w-full rounded-md border border-input bg-surface px-3 py-2.5 text-body outline-none focus:border-primary"
         />
         <Button className="mt-2" variant="outline" block loading={busy} onClick={() => void decryptPending()}>
-          解锁备份
+          {t('backup.unlock')}
         </Button>
       </section>
 
       <section className="rounded-lg border border-border bg-surface p-3">
         <div className="flex items-center justify-between">
-          <p className="text-body font-medium">本机快照</p>
+          <p className="text-body font-medium">{t('backup.snapshotsTitle')}</p>
           <Button size="sm" variant="ghost" loading={busy} onClick={() => void createSnapshot()}>
-            立即保存
+            {t('backup.saveNow')}
           </Button>
         </div>
         <p className="mt-0.5 text-caption text-muted-foreground">
-          最近 3 份自动快照，不加密，只保存在这台设备上。
+          {t('backup.snapshotsNote')}
         </p>
         {snapshots.length === 0 ? (
-          <p className="mt-2 text-caption text-muted-foreground">还没有快照。</p>
+          <p className="mt-2 text-caption text-muted-foreground">{t('backup.noSnapshots')}</p>
         ) : (
           <ul className="mt-2 divide-y divide-border">
             {snapshots.map((snapshot) => (
@@ -249,12 +250,12 @@ export function BackupPage() {
                 <span className="min-w-0 flex-1">
                   <span className="block text-body">{snapshot.reason}</span>
                   <span className="text-caption text-muted-foreground">
-                    {formatDateTime(snapshot.at)} · {snapshot.apps} 个工具
+                    {t('backup.snapshotMeta', { time: formatDateTime(snapshot.at), count: snapshot.apps })}
                   </span>
                 </span>
                 <Button size="sm" variant="ghost" onClick={() => setPendingSnapshot(snapshot)}>
                   <RotateCcw className="size-3.5" aria-hidden />
-                  恢复
+                  {t('backup.restore')}
                 </Button>
               </li>
             ))}
@@ -265,24 +266,24 @@ export function BackupPage() {
       <Dialog
         open={pendingRestore !== null}
         onClose={() => setPendingRestore(null)}
-        title="覆盖本机数据？"
-        description="恢复完成后，当前的应用与数据会被备份里的内容替换。"
+        title={t('backup.overwriteTitle')}
+        description={t('backup.overwriteDesc')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setPendingRestore(null)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" loading={busy} onClick={() => void confirmRestore()}>
-              覆盖并恢复
+              {t('backup.overwriteBtn')}
             </Button>
           </>
         }
       >
         {pendingRestore && (
           <div className="space-y-1 text-body">
-            <p>备份时间：{formatDateTime(pendingRestore.exportedAt)}</p>
-            <p>包含 {pendingRestore.apps.length} 个工具</p>
-            <p>数据记录 {pendingRestore.kv.length} 条</p>
+            <p>{t('backup.backupTime', { time: formatDateTime(pendingRestore.exportedAt) })}</p>
+            <p>{t('backup.containsApps', { count: pendingRestore.apps.length })}</p>
+            <p>{t('backup.kvCount', { count: pendingRestore.kv.length })}</p>
           </div>
         )}
       </Dialog>
@@ -290,12 +291,12 @@ export function BackupPage() {
       <Dialog
         open={pendingSnapshot !== null}
         onClose={() => setPendingSnapshot(null)}
-        title="恢复这个快照？"
-        description="当前的工具与数据会被快照里的内容替换。"
+        title={t('backup.snapshotTitle')}
+        description={t('backup.snapshotDesc')}
         footer={
           <>
             <Button variant="ghost" onClick={() => setPendingSnapshot(null)}>
-              取消
+              {t('common.cancel')}
             </Button>
             <Button variant="danger" loading={busy} onClick={() => void restoreFromSnapshot()}>
               恢复

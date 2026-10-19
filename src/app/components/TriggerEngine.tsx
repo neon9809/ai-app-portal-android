@@ -9,6 +9,7 @@ import { Bell, X } from 'lucide-react'
 import { invokeNative } from '@/shared/bridge'
 import { getAppSettings } from '@/shared/portal/db'
 import { runDueTimeTriggers } from '@/shared/portal/triggers'
+import { useI18n } from '@/shared/i18n'
 
 export interface PortalNotice {
   id: string
@@ -30,6 +31,7 @@ export interface PortalNotice {
  * 它触发时同样派发 portal:trigger / portal:notice，由这里统一展示。
  */
 export function TriggerEngineProvider({ children }: { children: ReactNode }) {
+  const { t } = useI18n()
   const [queue, setQueue] = useState<PortalNotice[]>([])
   const current = queue[0]
 
@@ -132,7 +134,7 @@ export function TriggerEngineProvider({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={dismiss}
-              aria-label="关闭提醒"
+              aria-label={t('trigger.closeAlert')}
               className="-mr-1 flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-accent"
             >
               <X className="size-4" aria-hidden />

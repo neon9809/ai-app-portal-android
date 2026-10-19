@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/shared/lib/cn'
+import { useI18n } from '@/shared/i18n'
 
 export interface DialogProps {
   open: boolean
@@ -20,6 +21,7 @@ export interface DialogProps {
  *  - 只是「确认 / 取消」这类标准弹窗，App UI 里优先用原生 showModal（体验更贴近系统）。
  */
 export function Dialog({ open, onClose, title, description, children, footer, className }: DialogProps) {
+  const { t } = useI18n()
   useEffect(() => {
     if (!open) return
     const onKeyDown = (event: KeyboardEvent) => {
@@ -63,7 +65,7 @@ export function Dialog({ open, onClose, title, description, children, footer, cl
           <button
             type="button"
             onClick={onClose}
-            aria-label="关闭"
+            aria-label={t('common.close')}
             className="-mr-1 flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
           >
             <X className="size-5" />

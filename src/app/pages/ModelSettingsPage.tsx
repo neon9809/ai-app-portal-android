@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Eye, EyeOff, Plug } from 'lucide-react'
 
 import { usePageTitle } from '@/app/layout/PageTitle'
+import { useI18n } from '@/shared/i18n'
 import {
   EMPTY_LLM_SETTINGS,
   isLlmConfigured,
@@ -14,7 +15,8 @@ import { Button } from '@/shared/ui/Button'
 import { useToast } from '@/shared/ui/Toast'
 
 export function ModelSettingsPage() {
-  usePageTitle('AI 模型')
+  const { t } = useI18n()
+  usePageTitle(t('model.title'))
   const { toast } = useToast()
   const [settings, setSettings] = useState<LlmSettings>(EMPTY_LLM_SETTINGS)
   const [showKey, setShowKey] = useState(false)
@@ -43,9 +45,9 @@ export function ModelSettingsPage() {
         model: settings.model.trim(),
         appModel: settings.appModel.trim(),
       })
-      toast({ title: '已保存', tone: 'success' })
+      toast({ title: t('model.saved'), tone: 'success' })
     } catch (error) {
-      toast({ title: '保存失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('model.saveFail'), description: (error as Error).message, tone: 'danger' })
     } finally {
       setSaving(false)
     }
@@ -53,7 +55,7 @@ export function ModelSettingsPage() {
 
   const test = async () => {
     if (!isLlmConfigured(settings)) {
-      toast({ title: '三项都要填', description: '服务地址、API Key、模型名', tone: 'warning' })
+      toast({ title: t('model.needAll'), description: t('model.needAllDesc'), tone: 'warning' })
       return
     }
     setTesting(true)
@@ -62,7 +64,7 @@ export function ModelSettingsPage() {
     setTesting(false)
     setTestResult(
       result.ok
-        ? { ok: true, text: `连通了，模型「${result.model}」可用` }
+        ? { ok: true, text: t('model.ok', { model: result.model }) }
         : { ok: false, text: result.message },
     )
   }
@@ -70,13 +72,13 @@ export function ModelSettingsPage() {
   return (
     <div className="page space-y-3">
       <section className="rounded-lg border border-border bg-surface p-3">
-        <p className="text-body font-medium">连接一个兼容 OpenAI 的模型服务</p>
+        <p className="text-body font-medium">{t('model.header')}</p>
         <p className="mt-0.5 text-caption text-muted-foreground">
-          生成器与应用内的 AI 功能都用它。密钥只保存在这台设备上。
+          {t('model.headerHint')}
         </p>
 
         <label htmlFor="base-url" className="mt-3 block text-caption font-medium">
-          服务地址
+          {t('model.baseUrl')}
         </label>
         <input
           id="base-url"
@@ -107,7 +109,7 @@ export function ModelSettingsPage() {
           <button
             type="button"
             onClick={() => setShowKey((value) => !value)}
-            aria-label={showKey ? '隐藏密钥' : '显示密钥'}
+            aria-label={showKey ? t('model.hideKey') : t('model.showKey')}
             className="flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-accent"
           >
             {showKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -115,7 +117,7 @@ export function ModelSettingsPage() {
         </div>
 
         <label htmlFor="model" className="mt-3 block text-caption font-medium">
-          模型名
+          {t('model.name')}
         </label>
         <input
           id="model"
@@ -128,7 +130,7 @@ export function ModelSettingsPage() {
         />
 
         <label htmlFor="app-model" className="mt-3 block text-caption font-medium">
-          应用内 AI 使用的模型（可选）
+          {t('model.appModel')}
         </label>
         <input
           id="app-model"
@@ -136,11 +138,11 @@ export function ModelSettingsPage() {
           autoCorrect="off"
           value={settings.appModel}
           onChange={(event) => update('appModel', event.target.value)}
-          placeholder="留空则与上面一致"
+          placeholder={t('model.appModelHint')}
           className="mt-1 w-full rounded-md border border-input bg-surface px-3 py-2.5 text-body outline-none focus:border-primary"
         />
 
-        <p className="mt-3 text-caption font-medium">生成温度</p>
+        <p className="mt-3 text-caption font-medium">{t('model.temperature')}</p>
         <div className="mt-1 flex gap-2">
           {[0.3, 0.7, 1].map((value) => (
             <button
@@ -153,7 +155,7 @@ export function ModelSettingsPage() {
                   : 'min-h-tap flex-1 rounded-md border border-border bg-surface text-body text-muted-foreground'
               }
             >
-              {value === 0.3 ? '稳一点' : value === 0.7 ? '均衡' : '活一点'}
+              {value === 0.3 ? t('model.tempLow') : value === 0.7 ? t('model.tempMid') : t('model.tempHigh')}
             </button>
           ))}
         </div>
@@ -169,20 +171,20 @@ export function ModelSettingsPage() {
       <div className="flex gap-2">
         <Button variant="outline" block loading={testing} onClick={() => void test()}>
           <Plug className="size-4" aria-hidden />
-          测试连接
+          {t('model.test')}
         </Button>
         <Button block loading={saving} onClick={() => void save()}>
-          保存
+          {t('model.save')}
         </Button>
       </div>
 
       <section className="rounded-lg border border-border bg-surface p-3">
-        <p className="text-body font-medium">填写说明</p>
+        <p className="text-body font-medium">{t('model.notesTitle')}</p>
         <ul className="mt-2 space-y-1.5 text-caption text-muted-foreground">
-          <li>· 地址填到版本号即可，系统会自动拼接 /chat/completions。</li>
+          <li>{t('model.note1')}</li>
           <li>· 常见写法：https://api.openai.com/v1、https://api.deepseek.com/v1。</li>
-          <li>· 密钥保存在本机数据库，不会出现在审计日志与导出给 AI 的内容里。</li>
-          <li>· 测试连接用的是当前输入值。</li>
+          <li>{t('model.note2')}</li>
+          <li>{t('model.note3')}</li>
         </ul>
       </section>
     </div>

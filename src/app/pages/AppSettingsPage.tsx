@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Bell, Trash2 } from 'lucide-react'
 
 import { usePageTitle } from '@/app/layout/PageTitle'
+import { useI18n } from '@/shared/i18n'
 import {
   deleteTrigger,
   getApp,
@@ -24,7 +25,8 @@ import { useToast } from '@/shared/ui/Toast'
  * 触发器只在门户打开时检查，关闭门户后不会在后台唤醒。
  */
 export function AppSettingsPage() {
-  usePageTitle('应用设置')
+  const { t, locale } = useI18n()
+  usePageTitle(t('appSettings.title'))
   const { id = '' } = useParams()
   const { toast } = useToast()
   const [app, setApp] = useState<PortalApp | null | undefined>(undefined)
@@ -49,7 +51,7 @@ export function AppSettingsPage() {
     try {
       await saveAppSettings(id, next)
     } catch (error) {
-      toast({ title: '保存失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('appSettings.saveFail'), description: (error as Error).message, tone: 'danger' })
       void load()
     }
   }
@@ -60,7 +62,7 @@ export function AppSettingsPage() {
     try {
       await saveTrigger(next)
     } catch (error) {
-      toast({ title: '保存失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('appSettings.saveFail'), description: (error as Error).message, tone: 'danger' })
       void load()
     }
   }
@@ -69,9 +71,9 @@ export function AppSettingsPage() {
     setTriggers((list) => list.filter((item) => item.id !== trigger.id))
     try {
       await deleteTrigger(trigger.id)
-      toast({ title: `已删除「${trigger.name}」`, tone: 'info' })
+      toast({ title: t('appSettings.triggerDeleted', { name: trigger.name }), tone: 'info' })
     } catch (error) {
-      toast({ title: '删除失败', description: (error as Error).message, tone: 'danger' })
+      toast({ title: t('appSettings.deleteFail'), description: (error as Error).message, tone: 'danger' })
       void load()
     }
   }
@@ -79,13 +81,13 @@ export function AppSettingsPage() {
   if (app === undefined || settings === null) {
     return (
       <div className="flex min-h-[50dvh] items-center justify-center">
-        <Spinner label="正在读取设置" />
+        <Spinner label={t('appSettings.loading')} />
       </div>
     )
   }
 
   if (app === null) {
-    return <EmptyState title="找不到这个应用" description="它可能已经被删除了。" />
+    return <EmptyState title={t('appSettings.notFound')} description={t('appSettings.notFoundDesc')} />
   }
 
   const notifications = settings.notifications
@@ -103,7 +105,7 @@ export function AppSettingsPage() {
           <div className="min-w-0 flex-1">
             <h2 className="text-title font-semibold">{app.name}</h2>
             <p className="mt-0.5 text-caption text-muted-foreground">
-              通知与触发器只影响这个工具。
+              {t('appSettings.scopeNote')}
             </p>
           </div>
         </div>
@@ -111,15 +113,15 @@ export function AppSettingsPage() {
 
       <section className="overflow-hidden rounded-lg border border-border bg-surface">
         <div className="px-4 pt-3">
-          <p className="text-body font-medium">通知</p>
+          <p className="text-body font-medium">{t('appSettings.notifyTitle')}</p>
           <p className="mt-0.5 text-caption text-muted-foreground">
-            提醒显示在门户顶部的横幅，不会推送到系统通知栏。
+            {t('appSettings.notifyHint')}
           </p>
         </div>
         <ul className="mt-1">
           <SettingRow
-            label="允许这个工具提醒我"
-            description="关闭后，它主动发的提醒和触发器提醒都会被忽略。"
+            label={t('appSettings.allowAlerts')}
+            description={t('appSettings.allowAlertsDesc')}
             checked={notifications.enabled}
             onChange={(checked) =>
               void updateSettings({
@@ -128,8 +130,8 @@ export function AppSettingsPage() {
             }
           />
           <SettingRow
-            label="显示横幅"
-            description="在门户顶部弹出提醒；关闭后只记录触发，不打扰。"
+            label={t('appSettings.banner')}
+            description={t('appSettings.bannerDesc')}
             checked={notifications.banner}
             disabled={!notifications.enabled}
             onChange={(checked) =>
@@ -139,8 +141,8 @@ export function AppSettingsPage() {
             }
           />
           <SettingRow
-            label="提醒时震动"
-            description="依赖手机的震动能力；浏览器预览没有效果。"
+            label={t('appSettings.vibrate')}
+            description={t('appSettings.vibrateDesc')}
             checked={notifications.vibrate}
             disabled={!notifications.enabled}
             onChange={(checked) =>
@@ -154,16 +156,16 @@ export function AppSettingsPage() {
 
       <section className="overflow-hidden rounded-lg border border-border bg-surface">
         <div className="px-4 pt-3">
-          <p className="text-body font-medium">触发器</p>
+          <p className="text-body font-medium">{t('appSettings.triggersTitle')}</p>
           <p className="mt-0.5 text-caption text-muted-foreground">
-            由这个工具注册。时间触发器在门户打开时检查；位置触发器在它运行且你允许定位时检查。
+            {t('appSettings.triggersHint')}
           </p>
         </div>
         {triggers.length === 0 ? (
           <div className="p-4">
             <EmptyState
-              title="还没有触发器"
-              description="这个工具可以按时间或位置注册触发器，例如「每天 21:00 提醒记账」。"
+              title={t('appSettings.noTriggers')}
+              description={t('appSettings.noTriggersDesc')}
             />
           </div>
         ) : (
@@ -173,19 +175,19 @@ export function AppSettingsPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-body">{trigger.name}</p>
                   <p className="mt-0.5 text-caption text-muted-foreground">
-                    {describeTrigger(trigger)}
+                    {describeTrigger(trigger, locale)}
                   </p>
                   <p className="mt-0.5 text-caption text-muted-foreground">
                     {trigger.lastFiredAt
-                      ? `最近触发 ${formatDateTime(trigger.lastFiredAt)} · 共 ${trigger.firedCount} 次`
-                      : '还没触发过'}
+                      ? t('appSettings.lastFired', { time: formatDateTime(trigger.lastFiredAt), count: trigger.firedCount })
+                      : t('appSettings.neverFired')}
                   </p>
                 </div>
                 <button
                   type="button"
                   role="switch"
                   aria-checked={trigger.enabled}
-                  aria-label={`${trigger.enabled ? '停用' : '启用'}「${trigger.name}」`}
+                  aria-label={`${trigger.enabled ? t('appSettings.disable') : t('appSettings.enable')}「${trigger.name}」`}
                   onClick={() => void toggleTrigger(trigger)}
                   className="flex h-11 w-14 shrink-0 items-center justify-center"
                 >
@@ -205,7 +207,7 @@ export function AppSettingsPage() {
                 </button>
                 <button
                   type="button"
-                  aria-label={`删除「${trigger.name}」`}
+                  aria-label={t('appSettings.deleteTrigger', { name: trigger.name })}
                   onClick={() => void removeTrigger(trigger)}
                   className="-mr-2 flex size-11 shrink-0 items-center justify-center rounded-md text-muted-foreground active:bg-accent"
                 >
@@ -221,8 +223,7 @@ export function AppSettingsPage() {
         <div className="flex items-start gap-2">
           <Bell className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
           <p className="text-caption text-muted-foreground">
-            门户是网页应用，没有系统级后台唤醒：关闭门户后触发器不会执行；错过的一次性 / 每日提醒会在下次打开时补发，
-            超过 30 分钟就不再补。
+            {t('appSettings.limitNote')}
           </p>
         </div>
       </section>
