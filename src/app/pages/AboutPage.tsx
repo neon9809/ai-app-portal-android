@@ -62,9 +62,6 @@ export function AboutPage() {
           <ShieldCheck className="size-4 text-muted-foreground" aria-hidden />
           <p className="text-body font-medium">能做什么、不能做什么</p>
         </div>
-        <p className="mt-0.5 text-caption text-muted-foreground">
-          这些限制来自手机网页的运行环境，不是临时开关；写清楚方便你判断哪些需求能做、哪些做不了。
-        </p>
         <ul className="mt-2 space-y-1.5 text-caption text-muted-foreground">
           <li>· 生成的应用运行在网页沙箱里，支持单文件 HTML / JS；不支持 Python 与 pip 安装。</li>
           <li>· 应用只能通过沙箱提供的能力访问本机存储、AI、白名单网络、剪贴板、文件、蓝牙、麦克风、相机和定位；每项都在首次使用时单独向你申请，可随时撤回。</li>

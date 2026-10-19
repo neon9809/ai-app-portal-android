@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from 'react'
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from 'lucide-react'
-import { cn } from '@/shared/lib/cn'
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'danger'
 
@@ -39,25 +38,13 @@ const TONE_ICON = {
   danger: XCircle,
 } as const
 
-const TONE_CLASS = {
-  info: 'text-primary',
-  success: 'text-success',
-  warning: 'text-warning',
-  danger: 'text-danger',
-} as const
-
-const TONE_BAR = {
-  info: 'bg-primary',
-  success: 'bg-success',
-  warning: 'bg-warning',
-  danger: 'bg-danger',
-} as const
-
 /**
- * 应用内 Toast。
+ * 应用内 Toast：从屏幕顶部垂下的主题色通知带。
  *
- * App UI 里的「轻提示」优先用原生 `showToast`（更贴近系统、性能更好）；
- * 本组件用于：管理后台（PC，无原生壳）、需要带描述/图标的富提示、以及原生接口不可用时的降级。
+ * 不占用底部输入栏的区域；上部主题色不透明、内容用白色，向下渐隐到透明。
+ * 整条带子不拦截点击（只有关闭按钮可点），不会挡住下面的导航。
+ * App UI 里的「轻提示」优先用原生 `showToast`；本组件用于需要带描述/图标的富提示，
+ * 以及原生接口不可用时的降级。
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([])
@@ -90,43 +77,45 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       <div
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex flex-col items-center gap-2 px-4 pb-[calc(var(--tabbar-height)+var(--safe-bottom)+8px)] md:items-end md:px-6"
+        className="toast-layer pointer-events-none fixed inset-x-0 z-40 flex flex-col"
         role="status"
         aria-live="polite"
       >
         {items.map((item) => {
           const Icon = TONE_ICON[item.tone]
           return (
-            <div
-              key={item.id}
-              className={cn(
-                'animate-slide-up pointer-events-auto relative flex w-full max-w-sm items-start gap-2.5',
-                'overflow-hidden rounded-md border border-border bg-surface p-3 shadow-md',
-              )}
-            >
-              <Icon className={cn('mt-0.5 size-4 shrink-0', TONE_CLASS[item.tone])} aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-body font-medium">{item.title}</p>
-                {item.description && (
-                  <p className="mt-0.5 break-words text-caption text-muted-foreground">{item.description}</p>
-                )}
+            <div key={item.id} className="toast-band animate-toast-in w-full px-4">
+              <div className="mx-auto flex w-full max-w-[640px] items-start gap-2.5 pt-2">
+                <Icon className="mt-0.5 size-4 shrink-0 text-primary-foreground" aria-hidden />
+                <div className="min-w-0 flex-1">
+                  <p className="text-body font-medium text-primary-foreground">{item.title}</p>
+                  {item.description && (
+                    <p className="mt-0.5 break-words text-caption text-primary-foreground/80">
+                      {item.description}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => dismiss(item.id)}
+                  className="pointer-events-auto -mr-2 -mt-2 flex size-11 shrink-0 items-center justify-center rounded-full text-primary-foreground/80 active:bg-primary-foreground/15"
+                  aria-label="关闭提示"
+                >
+                  <X className="size-4" aria-hidden />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => dismiss(item.id)}
-                className="-m-2 flex size-11 shrink-0 items-center justify-center rounded text-muted-foreground active:bg-accent"
-                aria-label="关闭提示"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
               {item.duration > 0 && (
-                <span className="absolute inset-x-0 bottom-0 h-0.5" aria-hidden>
+                <span
+                  className="mx-auto mt-2 block h-0.5 w-full max-w-[640px] bg-primary-foreground/20"
+                  aria-hidden
+                >
                   <span
-                    className={cn('toast-progress block h-full', TONE_BAR[item.tone])}
+                    className="toast-progress block h-full bg-primary-foreground/85"
                     style={{ animationDuration: `${item.duration}ms` }}
                   />
                 </span>
               )}
+              <div className="h-10" aria-hidden />
             </div>
           )
         })}

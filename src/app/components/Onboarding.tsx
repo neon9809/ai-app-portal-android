@@ -407,9 +407,9 @@ function SayScene({
             className="field-plain w-full resize-none bg-transparent px-2 py-2 text-body placeholder:text-muted-foreground"
           />
           <div className="flex items-center justify-end px-1 pb-1">
-            <Button onClick={submit} disabled={!canSubmit}>
+            <Button variant="spark" onClick={submit} disabled={!canSubmit}>
               <Sparkles className="size-4" aria-hidden />
-              开始做
+              开始
             </Button>
           </div>
         </section>

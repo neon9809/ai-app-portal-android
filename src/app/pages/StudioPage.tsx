@@ -10,6 +10,7 @@ import {
   RefreshCw,
   RotateCcw,
   Sparkles,
+  Trash2,
   X,
 } from 'lucide-react'
 
@@ -20,6 +21,7 @@ import { takeSnapshot } from '@/shared/portal/backup'
 import { pickFile } from '@/shared/portal/file-picker'
 import {
   cancelJob,
+  deleteRevision,
   getJob,
   inferPlan,
   inferRequirements,
@@ -37,6 +39,7 @@ import type {
 } from '@/shared/portal/types'
 import { formatDateTime, now, uid } from '@/shared/portal/utils'
 import { Button } from '@/shared/ui/Button'
+import { Dialog } from '@/shared/ui/Dialog'
 import { DotMark, DotPulse } from '@/shared/ui/Dot'
 import { Spinner } from '@/shared/ui/Feedback'
 import { useToast } from '@/shared/ui/Toast'
@@ -54,7 +57,12 @@ const MAX_IMAGE_BYTES = 800_000
 const MAX_TEXT_BYTES = 50_000
 
 /** 一键填入的起步示例：和首次引导里的例子保持一致 */
-const EXAMPLE_BRIEFS = ['记每天喝了几杯水', '做个没有广告的番茄钟']
+const EXAMPLE_BRIEFS = [
+  '记每天喝了几杯水',
+  '做个没有广告的番茄钟',
+  '帮我做一个跳一跳小游戏',
+  '帮我做一个可以弹奏的钢琴APP',
+]
 
 function bytesToDataUrl(bytes: Uint8Array, name: string): Promise<string> {
   const mime = /\.png$/i.test(name)
@@ -92,11 +100,15 @@ export function StudioPage() {
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const handledJobRef = useRef('')
   const liveBoxRef = useRef<HTMLPreElement>(null)
   const thinkingBoxRef = useRef<HTMLPreElement>(null)
   const [elapsed, setElapsed] = useState(0)
   const streamEndRef = useRef<HTMLDivElement>(null)
+  const composerDockRef = useRef<HTMLDivElement>(null)
+  const [composerHeight, setComposerHeight] = useState(0)
   const hasHtml = Boolean(app?.html)
   usePageTitle(hasHtml ? '继续开发' : '新建工具')
 
@@ -172,6 +184,22 @@ export function StudioPage() {
   const generating = Boolean(
     (job && RUNNING_PHASES.includes(job.phase)) || (busy && !hasHtml),
   )
+
+  // 底部输入栏是 fixed 浮层：内容末尾要留出它的实际高度，否则最后一张卡片会被压住。
+  // 附件会让输入栏变高，所以用 ResizeObserver 跟随，而不是写死一个占位高度。
+  useEffect(() => {
+    const element = composerDockRef.current
+    if (!element) return
+    const measure = () => setComposerHeight(element.getBoundingClientRect().height)
+    measure()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure)
+      return () => window.removeEventListener('resize', measure)
+    }
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [hasHtml, generating, attachments.length])
 
   // 生成期间给用户一个「正在等进行多久」的实感
   useEffect(() => {
@@ -343,6 +371,28 @@ export function StudioPage() {
     }
   }
 
+  const removeRevision = async () => {
+    if (!app || deleteTarget === null) return
+    setDeleting(true)
+    try {
+      const removedCount = app.revisions.length - deleteTarget
+      await deleteRevision(app.id, deleteTarget)
+      const latest = await getApp(app.id)
+      if (latest) setApp(latest)
+      setDeleteTarget(null)
+      toast({
+        title:
+          removedCount > 1 ? `已删除这一版及之后 ${removedCount - 1} 条记录` : '已删除这一版',
+        description: '工具已回退到这一版之前',
+        tone: 'success',
+      })
+    } catch (cause) {
+      toast({ title: '删除失败', description: (cause as Error).message, tone: 'danger' })
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   const retry = () => {
     setError(null)
     if (hasHtml) void submitRevision()
@@ -399,12 +449,9 @@ export function StudioPage() {
             </div>
           )}
 
-          <header className="pb-4">
-            <DotMark size="md" className="mb-3" />
+          <header className="flex flex-col items-center pb-4 pt-6 text-center">
+            <DotMark size="xl" className="mb-3" />
             <h1 className="text-display font-semibold">想做点什么？</h1>
-            <p className="mt-1 text-body text-muted-foreground">
-              一句话描述就行，数据怎么存、要不要联网由它判断。
-            </p>
           </header>
 
           <Composer
@@ -418,26 +465,25 @@ export function StudioPage() {
               setAttachments((current) => current.filter((_, position) => position !== index))
             }
             onSubmit={submit}
-            submitLabel="开始做"
+            submitLabel="开始"
             loading={busy}
           />
 
-          <p className="mt-3 text-center text-caption text-muted-foreground">
-            需要图片或文件作为参考时，可以添加附件。
-          </p>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-            <span className="text-caption text-muted-foreground">试试</span>
-            {EXAMPLE_BRIEFS.map((example) => (
-              <button
-                key={example}
-                type="button"
-                onClick={() => setBrief(example)}
-                className="min-h-tap rounded-full border border-border bg-surface px-3.5 text-caption text-foreground shadow-sm transition-colors duration-fast ease-standard active:bg-accent"
-              >
-                {example}
-              </button>
-            ))}
+          <div className="mt-4">
+            <p className="text-center text-caption text-muted-foreground">试试</p>
+            <div className="mt-2 flex flex-wrap justify-center gap-2">
+              {EXAMPLE_BRIEFS.map((example) => (
+                <button
+                  key={example}
+                  type="button"
+                  onClick={() => setBrief(example)}
+                  className="min-h-tap rounded-full border border-border bg-surface px-3.5 text-caption text-foreground shadow-sm transition-colors duration-fast ease-standard active:bg-accent"
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
           </div>
         </>
       )}
@@ -474,6 +520,9 @@ export function StudioPage() {
                 title={`已生成「${app.name}」`}
                 meta={formatDateTime(app.createdAt)}
                 steps={app.generationSteps}
+                onOpen={
+                  app.revisions.length === 0 ? () => navigate(`/app/${app.id}`) : undefined
+                }
               />
             )}
 
@@ -485,6 +534,12 @@ export function StudioPage() {
                   meta={formatDateTime(revision.at)}
                   steps={revision.steps}
                   onRollback={generating ? undefined : () => void rollback(index)}
+                  onDelete={generating ? undefined : () => setDeleteTarget(index)}
+                  onOpen={
+                    app && index === app.revisions.length - 1
+                      ? () => navigate(`/app/${app.id}`)
+                      : undefined
+                  }
                 />
               </div>
             ))}
@@ -510,16 +565,19 @@ export function StudioPage() {
                   ? '代码写完了，正在做最后的检查与保存。'
                   : !job?.live && !job?.thinking
                     ? `模型还没开始输出，已等待 ${elapsed} 秒…`
-                    : '生成期间建议保持门户在前台；切到后台可能被系统暂停。'}
+                    : '生成时请保持门户在前台。'}
               </p>
             )}
 
             <div ref={streamEndRef} />
-            {!generating && <div className="h-24" aria-hidden />}
+            {!generating && <div style={{ height: composerHeight }} aria-hidden />}
           </div>
 
           {!generating && (
-            <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background px-4 pb-safe-bottom pt-2">
+            <div
+              ref={composerDockRef}
+              className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-background px-4 pb-safe-bottom pt-2"
+            >
               <div className="mx-auto w-full max-w-[640px]">
                 <Composer
                   value={feedback}
@@ -534,7 +592,7 @@ export function StudioPage() {
                     )
                   }
                   onSubmit={submit}
-                  submitLabel="让它改"
+                  submitLabel="继续修改"
                   loading={busy}
                 />
               </div>
@@ -542,6 +600,34 @@ export function StudioPage() {
           )}
         </div>
       )}
+
+      <Dialog
+        open={deleteTarget !== null}
+        onClose={() => {
+          if (!deleting) setDeleteTarget(null)
+        }}
+        title="删除这一版？"
+        description="工具会回退到这一版之前的状态；这一版之后、依赖它的修改记录也会一起删除。此操作不可撤销。"
+        footer={
+          <>
+            <Button variant="ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>
+              取消
+            </Button>
+            <Button variant="danger" loading={deleting} onClick={() => void removeRevision()}>
+              删除并回退
+            </Button>
+          </>
+        }
+      >
+        {deleteTarget !== null && app && app.revisions[deleteTarget] && (
+          <div className="rounded-md bg-muted p-3">
+            <p className="line-clamp-2 text-body">{app.revisions[deleteTarget].request}</p>
+            <p className="mt-1 text-caption text-muted-foreground">
+              {formatDateTime(app.revisions[deleteTarget].at)}
+            </p>
+          </div>
+        )}
+      </Dialog>
     </div>
   )
 }
@@ -610,7 +696,7 @@ function Composer({
           <Paperclip className="size-4" aria-hidden />
           附件
         </button>
-        <Button loading={loading} onClick={onSubmit}>
+        <Button variant="spark" loading={loading} onClick={onSubmit}>
           <Sparkles className="size-4" aria-hidden />
           {submitLabel}
         </Button>
@@ -631,6 +717,8 @@ function AssistantTurn({
   thinking,
   liveRef,
   thinkingRef,
+  onOpen,
+  onDelete,
   onCancel,
   onRollback,
 }: {
@@ -644,6 +732,10 @@ function AssistantTurn({
   thinking?: string
   liveRef?: RefObject<HTMLPreElement | null>
   thinkingRef?: RefObject<HTMLPreElement | null>
+  /** 结果卡片上的一键打开：放在用户此刻正在看的卡片底部 */
+  onOpen?: () => void
+  /** 删除这一版（同时回退代码）；只在历史回合上出现 */
+  onDelete?: () => void
   onCancel?: () => void
   onRollback?: () => void
 }) {
@@ -728,6 +820,13 @@ function AssistantTurn({
           </>
         )}
 
+        {onOpen && (
+          <Button block className="mt-3" onClick={onOpen}>
+            打开工具
+            <ArrowUpRight className="size-4" aria-hidden />
+          </Button>
+        )}
+
         {running && onCancel && (
           <div className="mt-2 flex justify-end border-t border-border pt-2">
             <Button variant="ghost" size="sm" onClick={onCancel}>
@@ -737,15 +836,31 @@ function AssistantTurn({
           </div>
         )}
 
-        {!running && onRollback && (
-          <button
-            type="button"
-            onClick={onRollback}
-            className="mt-2 flex min-h-tap w-full items-center gap-1.5 border-t border-border pt-2 text-left text-caption text-muted-foreground active:bg-accent"
-          >
-            <RotateCcw className="size-3.5" aria-hidden />
-            回到这一版
-          </button>
+        {!running && (onRollback || onDelete) && (
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-1">
+            {onRollback ? (
+              <button
+                type="button"
+                onClick={onRollback}
+                className="flex min-h-tap items-center gap-1.5 text-left text-caption text-muted-foreground active:opacity-70"
+              >
+                <RotateCcw className="size-3.5" aria-hidden />
+                回到这一版
+              </button>
+            ) : (
+              <span />
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={onDelete}
+                className="flex min-h-tap items-center gap-1.5 text-caption text-danger active:opacity-70"
+              >
+                <Trash2 className="size-3.5" aria-hidden />
+                删除这一版
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>
@@ -768,7 +883,7 @@ function ChatBubble({
         className={cn(
           'max-w-[86%] rounded-lg px-3 py-2 text-body',
           isUser
-            ? 'rounded-br-sm bg-primary text-primary-foreground'
+            ? 'rounded-br-sm border border-primary/15 bg-primary-soft text-foreground'
             : 'rounded-bl-sm bg-muted text-foreground',
         )}
       >

@@ -1225,3 +1225,33 @@ export async function rollbackRevision(appId: string, revisionIndex: number): Pr
     step: 'review',
   })
 }
+
+/**
+ * 删除一条修改记录，并让工具代码回到这一版之前。
+ *
+ * 修改记录是一条链：每条只存 `before_html`，后面的版本建立在它之上。
+ * 所以删除中间某一版时，这一版之后依赖它的记录也会一起移除——否则历史链条
+ * 会和源码对不上。删除后 `app.html` 回到这一版的 `before_html`，沙箱下次
+ * 打开时按新源码加载。
+ */
+export async function deleteRevision(appId: string, revisionIndex: number): Promise<void> {
+  const app = await getApp(appId)
+  if (!app) throw new Error('找不到这个应用')
+  const revision = app.revisions[revisionIndex]
+  if (!revision) throw new Error('找不到这一版记录')
+  await saveApp({
+    ...app,
+    html: revision.before_html,
+    revisions: app.revisions.slice(0, revisionIndex),
+    updatedAt: now(),
+    step: 'review',
+  })
+  await addAudit({
+    id: uid('au_'),
+    appId: app.id,
+    appName: app.name,
+    kind: 'app.update',
+    detail: `删除修改记录并回退：${revision.request.slice(0, 80)}`,
+    at: now(),
+  })
+}

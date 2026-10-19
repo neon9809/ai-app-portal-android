@@ -132,7 +132,7 @@ export function UsagePage() {
           <p className="text-body font-medium">各工具的本机数据</p>
         </div>
         {apps.length === 0 ? (
-          <EmptyState title="还没有工具" description="生成或导入一个工具后，这里会显示它占用的空间。" className="py-6" />
+          <EmptyState title="还没有工具" description="生成或导入工具后，这里会显示占用。" className="py-6" />
         ) : (
           <ul className="mt-1">
             {apps.map(({ app, bytes }) => (

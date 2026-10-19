@@ -586,7 +586,37 @@
   }
 }
 
-/* Toast 底部倒计时：时长由内联 animationDuration 决定 */
+/* 顶部通知带：主题色从顶部不透明、向下渐隐到透明；内容用白色 */
+/* 顶部通知层：贴住标题条下缘（AppShell 顶栏 48px + 1px 分隔线），不从屏幕最顶开始 */
+.toast-layer {
+  top: calc(var(--safe-top) + 49px);
+}
+
+.toast-band {
+  background-image: linear-gradient(
+    to bottom,
+    rgb(var(--primary)) 0%,
+    rgb(var(--primary)) 62%,
+    rgb(var(--primary) / 0) 100%
+  );
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 280ms var(--ease-standard);
+}
+
+/* 通知带内的倒计时：时长由内联 animationDuration 决定 */
 @keyframes toast-progress {
   from {
     transform: scaleX(1);

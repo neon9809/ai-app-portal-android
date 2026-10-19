@@ -2,11 +2,14 @@ import { forwardRef, type ButtonHTMLAttributes } from 'react'
 import { cn } from '@/shared/lib/cn'
 import { DotPulse } from './Dot'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'danger-ghost'
+export type ButtonVariant = 'primary' | 'spark' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'danger-ghost'
 export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon'
 
 const VARIANTS: Record<ButtonVariant, string> = {
   primary: 'bg-primary text-primary-foreground hover:brightness-110',
+  // spark：人的主动操作（提交需求 / 修改）。土金点代表人的主动性，
+  // primary 品牌蓝代表模型与 AI 侧的动作，两者不要混用。
+  spark: 'bg-spark-bright text-spark-foreground hover:brightness-[0.97]',
   secondary: 'bg-secondary text-secondary-foreground hover:brightness-[0.97]',
   outline: 'border border-border bg-surface text-surface-foreground hover:bg-accent',
   ghost: 'text-foreground hover:bg-accent hover:text-accent-foreground',

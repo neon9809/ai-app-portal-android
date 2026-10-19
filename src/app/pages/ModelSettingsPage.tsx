@@ -181,9 +181,8 @@ export function ModelSettingsPage() {
         <ul className="mt-2 space-y-1.5 text-caption text-muted-foreground">
           <li>· 地址填到版本号即可，系统会自动拼接 /chat/completions。</li>
           <li>· 常见写法：https://api.openai.com/v1、https://api.deepseek.com/v1。</li>
-          <li>· 浏览器预览里可能被跨域拦截；真机上走壳的网络通道，不受此限制。</li>
           <li>· 密钥保存在本机数据库，不会出现在审计日志与导出给 AI 的内容里。</li>
-          <li>· 修改后记得点保存；测试连接用的是当前输入值。</li>
+          <li>· 测试连接用的是当前输入值。</li>
         </ul>
       </section>
     </div>

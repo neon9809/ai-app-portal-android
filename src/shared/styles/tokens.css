@@ -66,7 +66,8 @@
   --accent: var(--gray-100);
   --accent-foreground: 31 36 47;
 
-  /* 强调色：进度、序号、关键点缀。只做小面积使用。 */
+  /* 土金：人的主动操作（提交需求 / 修改）与关键点缀。
+     语义上，土金代表人的主动性，品牌蓝代表模型的智能补全；两者不要混用。 */
   --spark: var(--orange-700);
   --spark-foreground: var(--gray-0);
   --spark-soft: var(--orange-100);

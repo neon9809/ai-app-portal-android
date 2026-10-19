@@ -12,13 +12,14 @@ import { cn } from '@/shared/lib/cn'
  *  - DotField：装饰点阵（卡片角落的底纹）
  */
 
-export type DotSize = 'xs' | 'sm' | 'md' | 'lg'
+export type DotSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl'
 
 const DOT_SIZE: Record<DotSize, string> = {
   xs: 'size-[3px]',
   sm: 'size-1',
   md: 'size-1.5',
   lg: 'size-2',
+  xl: 'size-[10px]',
 }
 
 const DOT_GAP: Record<DotSize, string> = {
@@ -26,6 +27,7 @@ const DOT_GAP: Record<DotSize, string> = {
   sm: 'gap-[3px]',
   md: 'gap-1',
   lg: 'gap-[5px]',
+  xl: 'gap-1.5',
 }
 
 export type DotTone = 'brand' | 'inverse' | 'muted'

@@ -32,7 +32,7 @@ import {
 } from '@/shared/portal/db'
 import { buildPackage } from '@/shared/portal/package'
 import { isDeviceGroup } from '@/shared/portal/device'
-import { rollbackRevision } from '@/shared/portal/generator'
+import { deleteRevision, rollbackRevision } from '@/shared/portal/generator'
 import { getBudget, monthAppTokens, setBudget } from '@/shared/portal/budget'
 import type {
   AppCapabilityKey,
@@ -111,6 +111,8 @@ export function AppDetailPage() {
   const [showBudget, setShowBudget] = useState(false)
   const [budgetInput, setBudgetInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<number | null>(null)
+  const [deletingRevision, setDeletingRevision] = useState(false)
 
   usePageTitle(app?.name ?? '应用详情')
 
@@ -155,11 +157,11 @@ export function AppDetailPage() {
         copied = false
       }
     }
-    toast({
-      title: copied ? '源码已复制' : '复制失败',
-      description: copied ? '可以粘贴到任意文本编辑器里保存' : '请长按下方源码手动选择',
-      tone: copied ? 'success' : 'danger',
-    })
+    if (copied) {
+      toast({ title: '源码已复制', tone: 'success' })
+    } else {
+      toast({ title: '复制失败', description: '请长按下方源码手动选择', tone: 'danger' })
+    }
   }
 
   const exportPackage = async () => {
@@ -243,6 +245,27 @@ export function AppDetailPage() {
       toast({ title: '回滚失败', description: (error as Error).message, tone: 'danger' })
     } finally {
       setBusy(false)
+    }
+  }
+
+  const removeRevision = async () => {
+    if (!app || deleteTarget === null) return
+    setDeletingRevision(true)
+    try {
+      const removedCount = app.revisions.length - deleteTarget
+      await deleteRevision(app.id, deleteTarget)
+      setDeleteTarget(null)
+      await load()
+      toast({
+        title:
+          removedCount > 1 ? `已删除这一版及之后的 ${removedCount - 1} 条记录` : '已删除这一版',
+        description: '工具已回退到这一版之前',
+        tone: 'success',
+      })
+    } catch (error) {
+      toast({ title: '删除失败', description: (error as Error).message, tone: 'danger' })
+    } finally {
+      setDeletingRevision(false)
     }
   }
 
@@ -425,7 +448,7 @@ export function AppDetailPage() {
           <p className="text-body font-medium">开发面板</p>
         </div>
         <p className="mt-1 text-caption text-muted-foreground">
-          继续用对话改这个应用；最早的开发记录也在里面。
+          继续用对话修改这个应用。
         </p>
         <Button
           className="mt-2"
@@ -489,21 +512,31 @@ export function AppDetailPage() {
           </div>
           <ul className="mt-1">
             {app.revisions.map((revision, index) => (
-              <li key={`${revision.at}-${index}`} className="list-row py-3">
+              <li key={`${revision.at}-${index}`} className="list-row items-start py-3">
                 <div className="min-w-0 flex-1">
                   <p className="line-clamp-2 text-body">{revision.request}</p>
                   <p className="mt-0.5 text-caption text-muted-foreground">
                     {formatDateTime(revision.at)} · {revision.summary}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  loading={busy}
-                  onClick={() => void rollback(index)}
-                >
-                  回到这一版
-                </Button>
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={busy}
+                    onClick={() => void rollback(index)}
+                  >
+                    回到这一版
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger-ghost"
+                    disabled={busy}
+                    onClick={() => setDeleteTarget(index)}
+                  >
+                    删除这一版
+                  </Button>
+                </div>
               </li>
             ))}
           </ul>
@@ -626,7 +659,7 @@ export function AppDetailPage() {
         open={confirmClear}
         onClose={() => setConfirmClear(false)}
         title="清空这个应用的数据？"
-        description="应用保存的所有数据都会被删除，代码与权限不受影响。这个操作无法恢复。"
+        description="应用保存的所有数据都会被删除，代码与权限不受影响。"
         footer={
           <>
             <Button variant="ghost" onClick={() => setConfirmClear(false)}>
@@ -658,6 +691,42 @@ export function AppDetailPage() {
         }
       >
         <p className="text-body">要删除的是「{app.name}」。</p>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onClose={() => {
+          if (!deletingRevision) setDeleteTarget(null)
+        }}
+        title="删除这一版？"
+        description="工具会回退到这一版之前的状态；这一版之后、依赖它的修改记录也会一起删除。此操作不可撤销。"
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              disabled={deletingRevision}
+              onClick={() => setDeleteTarget(null)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              loading={deletingRevision}
+              onClick={() => void removeRevision()}
+            >
+              删除并回退
+            </Button>
+          </>
+        }
+      >
+        {deleteTarget !== null && app.revisions[deleteTarget] && (
+          <div className="rounded-md bg-muted p-3">
+            <p className="line-clamp-2 text-body">{app.revisions[deleteTarget].request}</p>
+            <p className="mt-1 text-caption text-muted-foreground">
+              {formatDateTime(app.revisions[deleteTarget].at)}
+            </p>
+          </div>
+        )}
       </Dialog>
     </div>
   )
