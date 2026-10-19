@@ -67,6 +67,11 @@ export interface AppCapabilities {
   notifications?: boolean
   /** 注册定时 / 位置触发器（可选） */
   triggers?: boolean
+  /**
+   * MCP 工具（可选）：列出应用要调用的工具 key（与生成器同名的键，如 get_time、
+   * 外部服务器工具 mock__echo）。运行时经 window.portal.mcp.call 走宿主执行。
+   */
+  mcp?: string[]
   python: false
 }
 
@@ -249,6 +254,7 @@ export type AppCapabilityKey =
   | 'location'
   | 'notifications'
   | 'triggers'
+  | 'mcp'
   | DeviceAbilityGroup
 
 /** 某应用某能力的运行时授权状态 */

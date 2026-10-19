@@ -29,6 +29,7 @@ import type {
   TriggerEvent,
 } from '@/shared/portal/types'
 import { chat, isLlmConfigured, readLlmSettings } from '@/shared/portal/llm'
+import { aggregateTools, executeEntry, readMcpConfig, readMcpServers } from '@/shared/portal/mcp'
 import {
   handleSandboxRequest,
   injectSandboxSdk,
@@ -82,6 +83,7 @@ const CAPABILITY_TEXT: Record<RuntimeCapability, { titleKey: string; description
   deviceRecorder: { titleKey: 'cap.deviceRecorder.title', descriptionKey: 'cap.deviceRecorder.desc' },
   deviceCameraModes: { titleKey: 'cap.deviceCameraModes.title', descriptionKey: 'cap.deviceCameraModes.desc' },
   deviceWeather: { titleKey: 'cap.deviceWeather.title', descriptionKey: 'cap.deviceWeather.desc' },
+  mcp: { titleKey: 'cap.mcp.title', descriptionKey: 'cap.mcp.desc' },
 }
 
 /**
@@ -96,6 +98,8 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
     (key: string, params?: Record<string, string | number>) => translate(locale, key, params),
     [locale],
   )
+  // 应用声明的 MCP 工具清单（capabilities.mcp）
+  const declaredMcpTools = app.manifest.capabilities.mcp ?? []
   const [reloadKey, setReloadKey] = useState(0)
   const [prompt, setPrompt] = useState<RuntimeCapability | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -592,6 +596,16 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
         setTriggerEnabled,
         notify,
         readAppSettings,
+        declaredMcpTools,
+        callMcpTool: async (tool: string, args: Record<string, unknown>) => {
+          const [mcpConfig, mcpServers] = await Promise.all([readMcpConfig(), readMcpServers()])
+          const aggregated = await aggregateTools(mcpConfig, mcpServers)
+          const entry = aggregated.entries.find((item) => item.key === tool)
+          if (!entry) {
+            throw new Error(`MCP 工具 ${tool} 不存在或已被停用（设置 → MCP 可管理）`)
+          }
+          return executeEntry(entry, args)
+        },
       }
 
       void (async () => {
@@ -630,7 +644,7 @@ export function SandboxFrame({ app }: { app: PortalApp }) {
 
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [app.id, app.manifest.capabilities, app.name, askPermission, callDevice, deviceAvailable, listAppTriggers, notify, readAppSettings, registerTrigger, removeTrigger, setTriggerEnabled, traceId])
+  }, [app.id, app.manifest.capabilities, app.name, askPermission, callDevice, declaredMcpTools, deviceAvailable, listAppTriggers, notify, readAppSettings, registerTrigger, removeTrigger, setTriggerEnabled, traceId])
 
   const networkHosts = app.manifest.capabilities.network
 

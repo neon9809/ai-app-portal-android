@@ -190,6 +190,18 @@ await test('静态检查：外链 / localStorage / 网页通知 / 直连 mcp 都
       `没有拦截：${snippet}`,
     )
   }
+  // MCP：调用 portal.mcp.call 却没声明 mcp 能力 → error；声明了但没调用 → warn
+  const mcpCall = 'window.portal.mcp.call("get_time", {})'
+  const undeclared = inspectHtml(
+    VALID_HTML.replace('<div id="app"></div>', `<div id="app"></div>${mcpCall}`),
+    caps(),
+  )
+  assert.ok(undeclared.some((item) => item.level === 'error' && item.message.includes('mcp')), '未声明的 portal.mcp.call 没有拦截')
+  const declaredUnused = inspectHtml(VALID_HTML, caps({ mcp: ['get_time'] }))
+  assert.ok(
+    declaredUnused.some((item) => item.level === 'warn' && item.message.includes('mcp')),
+    '声明了 mcp 但未调用应有 warn',
+  )
 })
 
 await test('静态检查：编造的设备能力名被拦截', () => {

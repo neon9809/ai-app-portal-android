@@ -124,6 +124,12 @@ const SDK_SOURCE = `
       // 应用设置页里的通知偏好（只读，写入由门户负责）
       get: function () { return call('settings.get', {}); }
     },
+    mcp: {
+      // 调用门户配置的 MCP 工具（须在 capabilities.mcp 里声明，首次调用会询问用户）
+      call: function (tool, args) {
+        return call('mcp.call', { tool: String(tool), args: args || {} });
+      }
+    },
     notify: function (input) { return call('notify', { input: input || {} }); },
     on: function (name, handler) {
       if (!listeners[name]) listeners[name] = [];
@@ -219,6 +225,10 @@ export interface SandboxKv {
 }
 
 export interface SandboxContext {
+  /** MCP 执行器：由宿主提供（聚合内置 + 外部服务器）；未配置时为 undefined */
+  callMcpTool?: (tool: string, args: Record<string, unknown>) => Promise<string>
+  /** 应用声明过的 MCP 工具清单（capabilities.mcp）；用于声明校验 */
+  declaredMcpTools?: readonly string[]
   appId: string
   appName: string
   capabilities: AppCapabilities
@@ -490,6 +500,18 @@ export async function handleSandboxRequest(
         type: options.type === 'gcj02' ? 'gcj02' : 'wgs84',
         isHighAccuracy: options.isHighAccuracy !== false,
       })
+    }
+    case 'mcp.call': {
+      const tool = String(params.tool ?? '')
+      if (!tool) throw new Error('缺少工具名')
+      if (!ctx.callMcpTool) throw new Error('门户没有配置可用的 MCP 工具')
+      const declared = ctx.capabilities.mcp ?? []
+      if (!declared.includes(tool)) {
+        throw new Error(`这个应用没有声明 MCP 工具 ${tool}（须写在 capabilities.mcp 里）`)
+      }
+      if (!(await ctx.ensurePermission('mcp'))) throw new Error('用户拒绝了这个能力')
+      const args = asRecord(params.args)
+      return ctx.callMcpTool(tool, args)
     }
     case 'device.available': {
       if (ctx.offline) return false

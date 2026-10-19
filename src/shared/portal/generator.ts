@@ -278,7 +278,8 @@ ${uiLanguageLine()} 所有状态齐全：加载中、空数据、出错都有明
 5.7 端侧设备能力：window.portal.device.call(能力名, 参数对象) 返回设备结果（对象或字符串）。调用前可用 await window.portal.device.available() 判断当前环境是否有设备桥；不可用时给出「浏览器预览不能使用设备能力，请在手机上打开」的提示，并提供重新加载或重试入口。只能调用下面列出的能力名，不得编造；用到的能力组必须写进 capabilities.device。调用可能失败（用户拒绝、设备服务不可用），必须 catch 并用白话提示 + 重试按钮，不要静默失败。
 【端侧能力组清单】
 ${deviceGroupPrompt()}
-5.8 提醒与触发器：
+5.8 MCP 工具：如果需求需要真实数据或外部能力，在 capabilities.mcp 里列出要用的工具 key（门户配置了哪些工具由运行环境决定，常见有 get_time 时间查询，以及用户添加的外部服务器工具）。运行时用 window.portal.mcp.call(tool, args) 调用，返回工具结果文本；调用可能失败（用户拒绝、工具停用），必须 catch 并给出白话提示。与需求无关就不要声明。
+5.8.1 提醒与触发器：
 - 提醒：window.portal.notify({ title, body }) 在门户顶部弹横幅，需 capabilities.notifications。它不是系统通知栏推送，门户关闭时无法送达，界面上要如实说明。
 - 触发器注册：window.portal.triggers.register({ name, schedule, location, action })，需 capabilities.triggers。
   · 时间条件 schedule 三选一：{ type: 'once', at: 时间戳 } / { type: 'daily', hour: 0-23, minute: 0-59 } / { type: 'interval', everyMinutes: 1-1440 }。
@@ -293,7 +294,7 @@ ${deviceGroupPrompt()}
 8. 不要打开新窗口、不要用 iframe、不要申请系统权限。
 9. 代码里写少量中文注释，帮助用户日后看懂。
 10. 用户通常只写一句需求。没提到的细节由你自己做合理判断：默认选择更少权限、更少联网、更简单的实现；不要反问用户，也不要输出需求确认问题。
-11. 剪贴板、文件、蓝牙、录音、相机、定位、通知、触发器以及 capabilities.device 里的端侧能力组都是敏感能力，只有需求里确实要用到时才声明，否则一律不要出现。
+11. 剪贴板、文件、蓝牙、录音、相机、定位、通知、触发器、capabilities.mcp 里的 MCP 工具以及 capabilities.device 里的端侧能力组都是敏感能力，只有需求里确实要用到时才声明，否则一律不要出现。
 12. 打开其它应用、修改系统设置、上传文件、打开快记录音这些操作会影响手机本身；只能在用户明确要求时调用，不要自作主张。
 
 工具（function calling）：本次请求的 tools 参数里列出了可用的本机与 MCP 工具。
@@ -504,6 +505,7 @@ export function parseGeneratedPayload(text: string): GeneratedPayload {
   const networkRaw = capabilitiesRaw.network
 
   const deviceRaw = capabilitiesRaw.device
+  const mcpRaw = capabilitiesRaw.mcp
 
   const capabilities: AppCapabilities = {
     storage: capabilitiesRaw.storage === true,
@@ -526,6 +528,9 @@ export function parseGeneratedPayload(text: string): GeneratedPayload {
           ),
         )
       : undefined,
+    mcp: Array.isArray(mcpRaw)
+      ? Array.from(new Set(mcpRaw.map(String).filter(Boolean))).slice(0, 8)
+      : [],
     python: false,
   }
 
@@ -604,6 +609,16 @@ export function inspectHtml(html: string, capabilities: AppCapabilities): Static
   }
   if (capabilities.triggers && !/portal\.triggers/.test(html)) {
     issues.push({ level: 'warn', message: '声明了触发器能力，但代码里没有调用 portal.triggers' })
+  }
+  const declaredMcp = capabilities.mcp ?? []
+  if (/portal\.mcp\.call/.test(html) && declaredMcp.length === 0) {
+    issues.push({
+      level: 'error',
+      message: '代码里调用了 portal.mcp.call，但 capabilities.mcp 是空的；把要用的 MCP 工具名列进去',
+    })
+  }
+  if (declaredMcp.length > 0 && !/portal\.mcp\.call/.test(html)) {
+    issues.push({ level: 'warn', message: '声明了 MCP 工具，但代码里没有调用 portal.mcp.call' })
   }
 
   // 端侧能力：只能走 portal.device.call，且能力名必须在连接器清单里

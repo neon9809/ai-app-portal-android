@@ -69,6 +69,7 @@ const CAPABILITY_LABEL: Record<AppCapabilityKey, string> = {
   deviceRecorder: 'cap.deviceRecorder.title',
   deviceCameraModes: 'cap.deviceCameraModes.title',
   deviceWeather: 'cap.deviceWeather.title',
+  mcp: 'cap.mcp.title',
 }
 
 const CAPABILITY_ORDER: AppCapabilityKey[] = [
@@ -92,6 +93,7 @@ const CAPABILITY_ORDER: AppCapabilityKey[] = [
   'deviceRecorder',
   'deviceCameraModes',
   'deviceWeather',
+  'mcp',
 ]
 
 export function AppDetailPage() {
@@ -417,9 +419,11 @@ export function AppDetailPage() {
             const declared =
               capability === 'network'
                 ? app.manifest.capabilities.network.length > 0
-                : isDeviceGroup(capability)
-                  ? Boolean(app.manifest.capabilities.device?.includes(capability))
-                  : Boolean(app.manifest.capabilities[capability])
+                : capability === 'mcp'
+                  ? (app.manifest.capabilities.mcp?.length ?? 0) > 0
+                  : isDeviceGroup(capability)
+                    ? Boolean(app.manifest.capabilities.device?.includes(capability))
+                    : Boolean(app.manifest.capabilities[capability])
             if (!declared) return null
             return (
               <li key={capability} className="list-row py-3">
@@ -428,6 +432,11 @@ export function AppDetailPage() {
                   {capability === 'network' && (
                     <p className="text-caption text-muted-foreground">
                       {app.manifest.capabilities.network.join('、')}
+                    </p>
+                  )}
+                  {capability === 'mcp' && (
+                    <p className="text-caption text-muted-foreground">
+                      {(app.manifest.capabilities.mcp ?? []).join('、')}
                     </p>
                   )}
                 </div>
