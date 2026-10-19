@@ -5,11 +5,12 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Check, ChevronLeft, Loader2, Sparkles } from 'lucide-react'
+import { Check, ChevronLeft, Loader2, Sparkles } from 'lucide-react'
 
 import { cn } from '@/shared/lib/cn'
 import { invokeNative } from '@/shared/bridge'
@@ -99,7 +100,7 @@ function prefersReducedMotion(): boolean {
 }
 
 /** 轻触反馈：真机壳走原生振动，浏览器预览里由 mock 兜底 */
-function tick(type: 'light' | 'medium' = 'light') {
+function tick(type: 'light' | 'medium' | 'heavy' = 'light') {
   void invokeNative('vibrateShort', { type }).catch(() => undefined)
 }
 
@@ -157,6 +158,7 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
   const [scene, setScene] = useState<Scene>('say')
   const [draft, setDraft] = useState('')
   const [built, setBuilt] = useState('')
+  const [wipe, setWipe] = useState<{ x: number; y: number; phase: 'cover' | 'open' } | null>(null)
   const [modelReady, setModelReady] = useState(true)
 
   useEffect(() => {
@@ -184,10 +186,24 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
     return () => window.removeEventListener('keydown', onKey)
   }, [onDone])
 
+  /** 「开始」的全屏转场：土金色从按钮中心盖满全屏，被遮住时切场景，再划开露出第二幕 */
   const startBuild = useCallback((text: string) => {
     setDraft(text)
     setBuilt(text)
-    setScene('build')
+    if (prefersReducedMotion()) {
+      setScene('build')
+      return
+    }
+    const button = document.querySelector('[data-start-button]')
+    const rect = button?.getBoundingClientRect()
+    const x = rect ? Math.round(rect.left + rect.width / 2) : Math.round(window.innerWidth / 2)
+    const y = rect ? Math.round(rect.top + rect.height / 2) : Math.round(window.innerHeight * 0.85)
+    setWipe({ x, y, phase: 'cover' })
+    window.setTimeout(() => {
+      setScene('build')
+      setWipe({ x, y, phase: 'open' })
+      window.setTimeout(() => setWipe(null), 640)
+    }, 500)
   }, [])
 
   const goUse = useCallback(() => setScene('use'), [])
@@ -300,9 +316,7 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
       <main className="relative min-h-0 flex-1 overflow-y-auto px-4 pb-6">
         {scene === 'say' && <SayScene initialDraft={draft} onStart={startBuild} />}
         {scene === 'build' && <BuildScene brief={built} onDone={goUse} onSkip={goUse} />}
-        {scene === 'use' && (
-          <UseScene brief={built} modelReady={modelReady} onConfigure={configureModel} />
-        )}
+        {scene === 'use' && <UseScene brief={built} />}
         <p className="sr-only" aria-live="polite">
           {SCENE_ANNOUNCE[scene]}
         </p>
@@ -327,6 +341,20 @@ function Onboarding({ closing, onDone }: { closing: boolean; onDone: () => void 
           </div>
         </footer>
       )}
+
+      {wipe?.phase === 'cover' && (
+        <span
+          className="wipe-cover"
+          style={{ '--wx': `${wipe.x}px`, '--wy': `${wipe.y}px` } as CSSProperties}
+          aria-hidden
+        />
+      )}
+      {wipe?.phase === 'open' && (
+        <>
+          <span className="wipe-half wipe-half-top" aria-hidden />
+          <span className="wipe-half wipe-half-bottom" aria-hidden />
+        </>
+      )}
     </div>
   )
 }
@@ -347,17 +375,30 @@ function SayScene({
   const [mode, setMode] = useState<DotMode>('grid')
   const [leaving, setLeaving] = useState(false)
   const [typing, setTyping] = useState(false)
+  const [pressStage, setPressStage] = useState<'idle' | 'attend' | 'press'>('idle')
   const typingRef = useRef<number | null>(null)
   const leaveRef = useRef<number | null>(null)
+  const autoStartRef = useRef<number | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  // submit 从定时器触发时要读到最新输入，闭包里的 draft 是旧的
+  const draftRef = useRef(initialDraft)
 
   useEffect(
     () => () => {
       if (typingRef.current !== null) window.clearInterval(typingRef.current)
       if (leaveRef.current !== null) window.clearTimeout(leaveRef.current)
+      if (autoStartRef.current !== null) window.clearTimeout(autoStartRef.current)
     },
     [],
   )
+
+  const cancelAutoStart = () => {
+    if (autoStartRef.current !== null) {
+      window.clearTimeout(autoStartRef.current)
+      autoStartRef.current = null
+    }
+    setPressStage('idle')
+  }
 
   const stopTyping = () => {
     if (typingRef.current !== null) {
@@ -367,34 +408,72 @@ function SayScene({
     setTyping(false)
   }
 
+  // 打开就先把示例写进输入框（含从菜单重新打开），输完自动点「开始」——
+  // 整段演示自己走起来，用户只需要看；想自己来，一动键盘或点别的例子就接管。
+  // 延迟一拍再开始：躲开 StrictMode 开发模式的双挂载（第一次挂载会立刻被卸载，定时器随之清掉）
+  useEffect(() => {
+    if (initialDraft.trim()) return
+    const start = window.setTimeout(() => typeInto(EXAMPLES[0], { autoStart: true }), 240)
+    return () => window.clearTimeout(start)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const syncDraft = (value: string) => {
+    draftRef.current = value
+    setDraft(value)
+  }
+
+  // 输完后自动提交。这是用户交互的起点，用三段强调：呼吸预热 → 按下（光环 + 震动）→ 提交
+  const scheduleAutoStart = () => {
+    const reduced = prefersReducedMotion()
+    autoStartRef.current = window.setTimeout(() => {
+      setPressStage('attend')
+      tick('light')
+      autoStartRef.current = window.setTimeout(() => {
+        setPressStage('press')
+        tick('heavy')
+        autoStartRef.current = window.setTimeout(() => {
+          setPressStage('idle')
+          submit()
+        }, reduced ? 260 : 800)
+      }, reduced ? 260 : 920)
+    }, 520)
+  }
+
   // 点例子后在输入框里逐字写出来，让用户看清「例子变成了我要说的话」
-  const typeInto = (text: string) => {
+  const typeInto = (text: string, options?: { autoStart?: boolean }) => {
     stopTyping()
-    setDraft('')
+    cancelAutoStart()
+    syncDraft('')
     setPulse((value) => value + 1)
     if (prefersReducedMotion()) {
-      setDraft(text)
+      syncDraft(text)
+      if (options?.autoStart) scheduleAutoStart()
       return
     }
     setTyping(true)
     let index = 0
     typingRef.current = window.setInterval(() => {
       index += 1
-      setDraft(text.slice(0, index))
+      syncDraft(text.slice(0, index))
       setPulse((value) => value + 1)
-      if (index >= text.length) stopTyping()
+      if (index >= text.length) {
+        stopTyping()
+        if (options?.autoStart) scheduleAutoStart()
+      }
     }, 34)
   }
 
   const submit = () => {
-    const text = draft.trim()
+    const text = draftRef.current.trim()
     if (!text || leaving) return
     stopTyping()
+    cancelAutoStart()
     inputRef.current?.blur()
     setLeaving(true)
     // 点阵先收拢成一个种子，下一幕再从同一个位置展开成轨道
     setMode('gather')
-    leaveRef.current = window.setTimeout(() => onStart(text), 340)
+    leaveRef.current = window.setTimeout(() => onStart(text), 200)
   }
 
   const canSubmit = draft.trim().length > 0 && !leaving && !typing
@@ -423,7 +502,8 @@ function SayScene({
             maxLength={120}
             onChange={(event) => {
               stopTyping()
-              setDraft(event.target.value)
+              cancelAutoStart()
+              syncDraft(event.target.value)
               setPulse((value) => value + 1)
             }}
             onFocus={() => {
@@ -435,8 +515,18 @@ function SayScene({
             placeholder="例如：一个记录每天喝水杯数的小工具"
             className="field-plain w-full resize-none bg-transparent px-2 py-2 text-body placeholder:text-muted-foreground"
           />
-          <div className="flex items-center justify-end px-1 pb-1">
-            <Button variant="spark" onClick={submit} disabled={!canSubmit}>
+          <div className="relative flex items-center justify-end px-1 pb-1">
+            <Button
+              variant="spark"
+              onClick={submit}
+              disabled={!canSubmit}
+              data-start-button
+              className={cn(
+                pressStage !== 'idle' && 'relative z-[1]',
+                pressStage === 'attend' && 'demo-attend',
+                pressStage === 'press' && 'demo-press',
+              )}
+            >
               <Sparkles className="size-4" aria-hidden />
               开始
             </Button>
@@ -705,15 +795,7 @@ function BuildScene({
  * 第三幕：直接用
  * ------------------------------------------------------------------ */
 
-function UseScene({
-  brief,
-  modelReady,
-  onConfigure,
-}: {
-  brief: string
-  modelReady: boolean
-  onConfigure: () => void
-}) {
+function UseScene({ brief }: { brief: string }) {
   return (
     <div className="onboarding-scene flex min-h-full flex-col">
       <div className="my-auto">
@@ -749,21 +831,14 @@ function UseScene({
         <p className="mt-3 text-center text-caption text-primary-foreground/80">
           每个权限都会先问你，可随时收回
         </p>
-
-        {!modelReady && (
-          <button
-            type="button"
-            onClick={onConfigure}
-            className="mx-auto mt-1 flex min-h-tap items-center gap-1 text-caption text-primary-foreground underline decoration-primary-foreground/50 underline-offset-4 active:opacity-80"
-          >
-            还没填 AI 模型？去设置
-            <ArrowRight className="size-3.5" aria-hidden />
-          </button>
-        )}
       </div>
     </div>
   )
 }
+
+/** 自动弹的开场句：《喜羊羊与灰太狼》主题曲「别看我只是一只羊」
+ *  1 1 1 1 7 5 3 5，这里的 1 是高音 Do（最后一个键） */
+const MELODY = [7, 7, 7, 7, 6, 4, 2, 4] as const
 
 /** 演示用的小钢琴：Web Audio 合成，不加载任何外部音频 */
 function PocketPiano() {
@@ -779,8 +854,8 @@ function PocketPiano() {
     [],
   )
 
-  const play = (index: number) => {
-    tick('light')
+  const play = (index: number, options?: { silent?: boolean }) => {
+    if (!options?.silent) tick('light')
     setPlayed(index)
     if (resetRef.current !== null) window.clearTimeout(resetRef.current)
     resetRef.current = window.setTimeout(() => setPlayed(null), 260)
@@ -808,6 +883,22 @@ function PocketPiano() {
       // 浏览器禁用音频时静默，演示仍可继续
     }
   }
+
+  // 进入演示自动弹一句开场旋律，琴键跟着亮：用户第一眼就看到「工具已经能用」
+  const playRef = useRef(play)
+  playRef.current = play
+  useEffect(() => {
+    const timers: number[] = []
+    const start = window.setTimeout(() => {
+      MELODY.forEach((keyIndex, position) => {
+        timers.push(window.setTimeout(() => playRef.current(keyIndex, { silent: true }), position * 300))
+      })
+    }, 700)
+    return () => {
+      window.clearTimeout(start)
+      timers.forEach((timer) => window.clearTimeout(timer))
+    }
+  }, [])
 
   return (
     <div className="mt-4">

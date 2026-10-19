@@ -586,7 +586,96 @@
   }
 }
 
-/* 顶部通知带：主题色从顶部不透明、向下渐隐到透明；内容用白色 */
+/* 引导页自动点「开始」：按钮呼吸预热 → 重按下（重震动）→ 全屏土金转场 */
+
+@keyframes demo-attend {
+  0%,
+  100% {
+    transform: none;
+    box-shadow: 0 0 0 0 rgb(var(--spark-bright) / 0);
+  }
+  50% {
+    transform: scale(1.07);
+    box-shadow:
+      0 0 0 9px rgb(var(--spark-bright) / 0.32),
+      0 6px 22px rgb(var(--spark-bright) / 0.35);
+  }
+}
+
+.demo-attend {
+  animation: demo-attend 900ms ease-in-out;
+}
+
+/* 按下：更狠的压缩 + 回弹 */
+@keyframes demo-press {
+  0% {
+    transform: none;
+  }
+  28% {
+    transform: scale(0.86);
+  }
+  62% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+.demo-press {
+  animation: demo-press 780ms var(--ease-standard);
+}
+
+/* 引导页点「开始」的全屏转场：土金色从按钮中心扩散盖满全屏，
+ * 场景在被遮住的瞬间切换，再上下划开露出第二幕 */
+@keyframes wipe-cover {
+  from {
+    clip-path: circle(0px at var(--wx) var(--wy));
+  }
+  to {
+    clip-path: circle(160vmax at var(--wx) var(--wy));
+  }
+}
+
+.wipe-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgb(var(--spark-bright));
+  animation: wipe-cover 480ms var(--ease-standard) both;
+}
+
+.wipe-half {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 50.5%;
+  z-index: 70;
+  background: rgb(var(--spark-bright));
+}
+
+@keyframes wipe-half-up {
+  to {
+    transform: translateY(-102%);
+  }
+}
+
+@keyframes wipe-half-down {
+  to {
+    transform: translateY(102%);
+  }
+}
+
+.wipe-half-top {
+  top: 0;
+  animation: wipe-half-up 620ms var(--ease-standard) both;
+}
+
+.wipe-half-bottom {
+  bottom: 0;
+  animation: wipe-half-down 620ms var(--ease-standard) both;
+}
+
 /* 顶部通知层：贴住标题条下缘（AppShell 顶栏 48px + 1px 分隔线），不从屏幕最顶开始 */
 .toast-layer {
   top: calc(var(--safe-top) + 49px);
