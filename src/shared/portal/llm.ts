@@ -437,7 +437,13 @@ export async function chatStream(
     throw Object.assign(new Error('已取消'), { name: 'AbortError' })
   }
   const controller = new AbortController()
-  const timer = window.setTimeout(() => controller.abort(), timeoutMs)
+  // 空闲超时：不是「总时长 240s」，而是「连续 240s 没有任何输出」才判卡死。
+  // 代码量大、模型持续输出几十 KB 时不会中途被掐断；每收到一段数据就续期。
+  const idleTimer = { id: window.setTimeout(() => controller.abort(), timeoutMs) }
+  const bumpIdle = () => {
+    window.clearTimeout(idleTimer.id)
+    idleTimer.id = window.setTimeout(() => controller.abort(), timeoutMs)
+  }
   const onAbort = () => controller.abort()
   options?.signal?.addEventListener('abort', onAbort, { once: true })
 
@@ -465,7 +471,7 @@ export async function chatStream(
       signal: controller.signal,
     })
   } catch (error) {
-    window.clearTimeout(timer)
+    window.clearTimeout(idleTimer.id)
     options?.signal?.removeEventListener('abort', onAbort)
     if (options?.signal?.aborted) throw error
     throw new LlmError(
@@ -475,7 +481,7 @@ export async function chatStream(
   }
 
   if (!response.ok) {
-    window.clearTimeout(timer)
+    window.clearTimeout(idleTimer.id)
     options?.signal?.removeEventListener('abort', onAbort)
     const text = await response.text().catch(() => '')
     let payload: unknown = text
@@ -487,7 +493,7 @@ export async function chatStream(
     throw explainStatus(response.status, payload)
   }
   if (!response.body) {
-    window.clearTimeout(timer)
+    window.clearTimeout(idleTimer.id)
     options?.signal?.removeEventListener('abort', onAbort)
     throw new LlmError('bad-response', '这个环境拿不到流式响应')
   }
@@ -534,6 +540,7 @@ export async function chatStream(
         } catch {
           continue
         }
+        bumpIdle()
         if (style === 'responses') {
           // Responses API：response.output_text.delta 出正文，
           // response.reasoning_summary_text.delta 出思考摘要，response.completed 带用量
@@ -604,7 +611,7 @@ export async function chatStream(
     }
     throw new LlmError('network', `流式读取中断：${(error as Error)?.message ?? '网络错误'}`)
   } finally {
-    window.clearTimeout(timer)
+    window.clearTimeout(idleTimer.id)
     options?.signal?.removeEventListener('abort', onAbort)
   }
 

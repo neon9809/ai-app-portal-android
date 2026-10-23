@@ -1115,7 +1115,8 @@ async function runStreamingChatOnce(
     if (controller.signal.aborted) throw new CancelledError()
     // 已经收到部分内容时不再回退重发，避免同一个请求计费两次
     if (received) throw error
-    if (error instanceof LlmError && error.kind !== 'network' && error.kind !== 'bad-response') {
+    if (error instanceof LlmError && error.kind === 'config') {
+      // 配置错（地址/模型名不对）：换非流式也一样失败，不浪费一次请求
       throw error
     }
     patchJob(appId, {
@@ -1132,6 +1133,8 @@ async function runStreamingChatOnce(
       settings,
       model: settings.model,
       signal: controller.signal,
+      // 非流式一次性等完整结果：大代码量生成给足时间
+      timeoutMs: 600_000,
       ...(tools && tools.length > 0 ? { tools } : {}),
     })
   } finally {
