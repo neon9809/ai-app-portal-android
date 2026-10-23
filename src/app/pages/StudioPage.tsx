@@ -779,7 +779,7 @@ function AssistantTurn({
             )}
           >
             {running ? (
-              <DotPulse className="text-primary" />
+              <DotPulse size="sm" className="text-primary" />
             ) : (
               <Check className="size-4 text-success" strokeWidth={3} aria-hidden />
             )}
@@ -1015,7 +1015,7 @@ function previewLive(live: string): string {
 
 function StepIcon({ status }: { status: JobStep['status'] }) {
   if (status === 'done') return <Check className="size-4 text-success" aria-hidden />
-  if (status === 'active') return <DotPulse className="text-primary" />
+  if (status === 'active') return <DotPulse size="sm" className="text-primary" />
   if (status === 'warn') return <AlertTriangle className="size-4 text-warning" aria-hidden />
   if (status === 'error') return <CircleSlash className="size-4 text-danger" aria-hidden />
   return <span className="size-4 rounded-full border border-border" aria-hidden />

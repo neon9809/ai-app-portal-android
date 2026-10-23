@@ -137,13 +137,30 @@ export function DotWave({
 }
 
 /** 按钮内的三点脉冲：继承当前文字颜色，跟着按钮状态走 */
-export function DotPulse({ className }: { className?: string }) {
+export function DotPulse({
+  size = 'md',
+  className,
+}: {
+  /** sm：紧凑档（4px 点 + 3px 间距，总宽 18px），用于 16-28px 的窄槽位 */
+  size?: 'sm' | 'md'
+  className?: string
+}) {
   return (
-    <span className={cn('inline-flex items-center gap-1', className)} aria-hidden>
+    <span
+      className={cn(
+        'inline-flex items-center',
+        size === 'sm' ? 'gap-[3px]' : 'gap-1',
+        className,
+      )}
+      aria-hidden
+    >
       {[0, 1, 2].map((index) => (
         <span
           key={index}
-          className="dot-pulse-core size-1.5 rounded-full bg-current"
+          className={cn(
+            'dot-pulse-core rounded-full bg-current',
+            size === 'sm' ? 'size-1' : 'size-1.5',
+          )}
           style={{ animationDelay: `${index * 130}ms` }}
         />
       ))}
